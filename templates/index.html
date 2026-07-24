@@ -204,7 +204,7 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
     <div class="flex-1">
      <textarea id="pTxt" rows="2" class="w-full bg-transparent text-lg resize-none"></textarea>
      <div id="mBox" class="hide mt-2 relative">
-      <img id="mImg" class="hide max-h-72 rounded-2xl border brd">
+      <img id="mImg" class="hide max-h-72 w-full rounded-2xl border brd object-contain bg-black/20">
       <video id="mVid" class="hide max-h-72 rounded-2xl border brd w-full" controls></video>
       <button onclick="clrMedia()" class="absolute top-2 right-2 bg-black/70 rounded-full w-8 h-8 font-bold">&#10005;</button>
      </div>
@@ -273,6 +273,10 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
     <div class="flex-1 flex flex-col min-w-0">
      <div id="chHead" class="border-b brd p-2.5 sm:p-3 text-sm text-gray-500"></div>
      <div id="chMsgs" class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-1.5"></div>
+     <div id="chEditBar" class="hide px-3 sm:px-4 py-1.5 text-xs text-sky-400 border-t brd flex items-center justify-between">
+      <span id="tEditing"></span>
+      <span class="cursor-pointer text-gray-500 hover:text-red-400 font-semibold" onclick="cancelEditMsg()">&#10005;</span>
+     </div>
      <div id="chBar" class="hide p-2.5 sm:p-3 flex gap-2 items-center border-t brd">
       <input id="chInp" onkeydown="if(event.key==='Enter')sendMsg()" class="flex-1 bg-neutral-900 border brd rounded-full px-4 sm:px-5 py-2.5 sm:py-3 text-sm">
       <button onclick="sendMsg()" class="bb text-white rounded-full w-10 h-10 sm:w-11 sm:h-11 shrink-0 font-bold">&#10148;</button>
@@ -305,7 +309,9 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
     <div id="ceoExtra" class="mt-6 space-y-4 text-left"></div>
 
     <div id="ceoAddWrap" class="hide mt-6 pt-5 border-t brd">
-     <button id="ceoAddBtn" onclick="toggleCeoAddForm()" class="mx-auto flex items-center justify-center w-11 h-11 rounded-full bb text-white text-2xl font-bold leading-none" title="+" aria-label="+">+</button>
+     <div class="flex justify-center">
+      <button id="ceoAddBtn" onclick="toggleCeoAddForm()" class="flex items-center justify-center w-12 h-12 rounded-full bb text-white text-2xl font-bold leading-none shrink-0" title="+" aria-label="+">+</button>
+     </div>
      <div id="ceoAddForm" class="hide text-left space-y-3 mt-4">
       <p id="tAddCeo" class="text-sm font-bold text-sky-500"></p>
       <input id="acNm" class="inp"><input id="acTt" class="inp"><textarea id="acBi" rows="3" class="inp resize-none"></textarea>
@@ -360,9 +366,9 @@ var LANG=localStorage.getItem("chalker_lang")||"uz";
 window.onerror=function(m,s,l){alert("JS xato: "+m+" ("+l+")")};
 
 var TR={
-uz:{slogan:"Maktab ijtimoiy tarmog'i",tag:"Fikrlaring bilan maktabni bo'yab tashla!",lg:"Kirish",rg:"Ro'yxatdan o'tish",na:"Akkount yo'qmi?",ha:"Akkount bormi?",un:"Username",pw:"Parol",fn:"To'liq ism",uT:"Band",uF:"Bo'sh",v1:"Chalking",v2:"Yangiliklar",v3:"Profil",v4:"Chat",v5:"Bildirishnoma",v6:"Til",v7:"CEO",out:"Chiqish",wh:"Nima gaplar?!",md:"Rasm/Video",ef:"Postlar yo'q. Birinchi bo'l!",av:"Avatar",rl:"MAQOM",st:"O'quvchi",tc:"O'qituvchi",geo:"Hudud va maktab",ct:"DAVLAT",rgn:"VILOYAT",sc:"MAKTAB",kl:"SINF",c1:"Davlatni tanlang",c2:"Viloyatni tanlang",c4:"Maktabni tanlang",c5:"Sinfni tanlang",bd:"TUG'ILGAN KUN",hd:"Yashirish",ht:"YURAK",hA:"Bo'sh",hC:"Murakkab",hL:"Band",hP:"Sir",sv:"Saqlash",svd:"Saqlandi!",ac:"Akkount xavfsizligi",aU:"Yangi username",aC:"Joriy parol",aN:"Yangi parol",up:"Yangilash",chs:"Chatlar",nc:"+ Yangi",slc:"Suhbatni tanlang",mp:"Xabar yozing...",nch:"Suhbatlar yo'q",pu:"Username kiriting:",np:"Yangi e'lon...",pb:"E'lon qilish",nn:"Yangiliklar yo'q",bd2:"Yangilik huquqini berish/olish",gr:"Huquqni almashtirish",ed:"Tahrirlash",dl:"O'chirish",fl:"Follow",uf:"Unfollow",sm:"Xabar yozish",hdn:"Yashirin",rp:"Javob yozing...",snd:"Yuborish",fc:"Birinchi komment yoz",cn:"bekor",cd:"Rostdan o'chirasizmi?",ep:"Yangi matn:",rpl:"Javob",nnt:"Bildirishnomalar yo'q",l1:"yurakcha bosdi",l2:"komment yozdi",l3:"xabar yubordi",l4:"yangi e'lon",cN:"Ism",cT:"Lavozim",cB:"Bio",addCeo:"Yangi CEO qo'shish"},
-en:{slogan:"School social network",tag:"Chalk up your school with your thoughts!",lg:"Log in",rg:"Sign up",na:"No account?",ha:"Have an account?",un:"Username",pw:"Password",fn:"Full name",uT:"Taken",uF:"Available",v1:"Chalking",v2:"News",v3:"Profile",v4:"Chat",v5:"Notifications",v6:"Language",v7:"CEO",out:"Log out",wh:"What's happening?!",md:"Image/Video",ef:"No posts yet. Be first!",av:"Avatar",rl:"ROLE",st:"Student",tc:"Teacher",geo:"Region & school",ct:"COUNTRY",rgn:"REGION",sc:"SCHOOL",kl:"CLASS",c1:"Select country",c2:"Select region",c4:"Select school",c5:"Select class",bd:"BIRTHDAY",hd:"Hide",ht:"HEART",hA:"Available",hC:"Complicated",hL:"Locked",hP:"Private",sv:"Save",svd:"Saved!",ac:"Account security",aU:"New username",aC:"Current password",aN:"New password",up:"Update",chs:"Chats",nc:"+ New",slc:"Select a chat",mp:"Type a message...",nch:"No chats",pu:"Enter username:",np:"New announcement...",pb:"Publish",nn:"No news",bd2:"Grant/revoke news rights",gr:"Toggle rights",ed:"Edit",dl:"Delete",fl:"Follow",uf:"Unfollow",sm:"Message",hdn:"Hidden",rp:"Write a reply...",snd:"Send",fc:"Be first to comment",cn:"cancel",cd:"Really delete?",ep:"New text:",rpl:"Reply",nnt:"No notifications",l1:"liked your post",l2:"commented",l3:"sent a message",l4:"new announcement",cN:"Name",cT:"Title",cB:"Bio",addCeo:"Add new CEO"},
-ru:{slogan:"Школьная соцсеть",tag:"Раскрась школу своими мыслями!",lg:"Войти",rg:"Регистрация",na:"Нет аккаунта?",ha:"Есть аккаунт?",un:"Имя пользователя",pw:"Пароль",fn:"Полное имя",uT:"Занято",uF:"Свободно",v1:"Chalking",v2:"Новости",v3:"Профиль",v4:"Чат",v5:"Уведомления",v6:"Язык",v7:"CEO",out:"Выйти",wh:"Что нового?!",md:"Фото/Видео",ef:"Постов нет. Будьте первым!",av:"Аватар",rl:"СТАТУС",st:"Ученик",tc:"Учитель",geo:"Регион и школа",ct:"СТРАНА",rgn:"ОБЛАСТЬ",sc:"ШКОЛА",kl:"КЛАСС",c1:"Выберите страну",c2:"Выберите область",c4:"Выберите школу",c5:"Выберите класс",bd:"ДЕНЬ РОЖДЕНИЯ",hd:"Скрыть",ht:"СЕРДЦЕ",hA:"Свободен(а)",hC:"Всё сложно",hL:"Занят(а)",hP:"Секрет",sv:"Сохранить",svd:"Сохранено!",ac:"Безопасность",aU:"Новый username",aC:"Текущий пароль",aN:"Новый пароль",up:"Обновить",chs:"Чаты",nc:"+ Новый",slc:"Выберите чат",mp:"Сообщение...",nch:"Чатов нет",pu:"Введите username:",np:"Новое объявление...",pb:"Опубликовать",nn:"Новостей нет",bd2:"Право на новости",gr:"Переключить право",ed:"Изменить",dl:"Удалить",fl:"Подписаться",uf:"Отписаться",sm:"Написать",hdn:"Скрыто",rp:"Ответ...",snd:"Отправить",cn:"отмена",fc:"Будьте первым",cd:"Точно удалить?",ep:"Новый текст:",rpl:"Ответить",nnt:"Уведомлений нет",l1:"понравился ваш пост",l2:"комментировал",l3:"отправил сообщение",l4:"новое объявление",cN:"Имя",cT:"Должность",cB:"Био",addCeo:"Добавить нового CEO"}};
+uz:{slogan:"Maktab ijtimoiy tarmog'i",tag:"Fikrlaring bilan maktabni bo'yab tashla!",lg:"Kirish",rg:"Ro'yxatdan o'tish",na:"Akkount yo'qmi?",ha:"Akkount bormi?",un:"Username",pw:"Parol",fn:"To'liq ism",uT:"Band",uF:"Bo'sh",v1:"Chalking",v2:"Yangiliklar",v3:"Profil",v4:"Chat",v5:"Bildirishnoma",v6:"Til",v7:"CEO",out:"Chiqish",wh:"Nima gaplar?!",md:"Rasm/Video",ef:"Postlar yo'q. Birinchi bo'l!",av:"Avatar",rl:"MAQOM",st:"O'quvchi",tc:"O'qituvchi",geo:"Hudud va maktab",ct:"DAVLAT",rgn:"VILOYAT",sc:"MAKTAB",kl:"SINF",c1:"Davlatni tanlang",c2:"Viloyatni tanlang",c4:"Maktabni tanlang",c5:"Sinfni tanlang",bd:"TUG'ILGAN KUN",hd:"Yashirish",ht:"YURAK",hA:"Bo'sh",hC:"Murakkab",hL:"Band",hP:"Sir",sv:"Saqlash",svd:"Saqlandi!",ac:"Akkount xavfsizligi",aU:"Yangi username",aC:"Joriy parol",aN:"Yangi parol",up:"Yangilash",chs:"Chatlar",nc:"+ Yangi",slc:"Suhbatni tanlang",mp:"Xabar yozing...",nch:"Suhbatlar yo'q",pu:"Username kiriting:",np:"Yangi e'lon...",pb:"E'lon qilish",nn:"Yangiliklar yo'q",bd2:"Yangilik huquqini berish/olish",gr:"Huquqni almashtirish",ed:"Tahrirlash",dl:"O'chirish",fl:"Follow",uf:"Unfollow",sm:"Xabar yozish",hdn:"Yashirin",rp:"Javob yozing...",snd:"Yuborish",fc:"Birinchi komment yoz",cn:"bekor",cd:"Rostdan o'chirasizmi?",ep:"Yangi matn:",rpl:"Javob",nnt:"Bildirishnomalar yo'q",l1:"yurakcha bosdi",l2:"komment yozdi",l3:"xabar yubordi",l4:"yangi e'lon",cN:"Ism",cT:"Lavozim",cB:"Bio",addCeo:"Yangi CEO qo'shish",today:"Bugun",yesterday:"Kecha",editedTag:"(tahrirlangan)",editingMsg:"Xabar tahrirlanmoqda..."},
+en:{slogan:"School social network",tag:"Chalk up your school with your thoughts!",lg:"Log in",rg:"Sign up",na:"No account?",ha:"Have an account?",un:"Username",pw:"Password",fn:"Full name",uT:"Taken",uF:"Available",v1:"Chalking",v2:"News",v3:"Profile",v4:"Chat",v5:"Notifications",v6:"Language",v7:"CEO",out:"Log out",wh:"What's happening?!",md:"Image/Video",ef:"No posts yet. Be first!",av:"Avatar",rl:"ROLE",st:"Student",tc:"Teacher",geo:"Region & school",ct:"COUNTRY",rgn:"REGION",sc:"SCHOOL",kl:"CLASS",c1:"Select country",c2:"Select region",c4:"Select school",c5:"Select class",bd:"BIRTHDAY",hd:"Hide",ht:"HEART",hA:"Available",hC:"Complicated",hL:"Locked",hP:"Private",sv:"Save",svd:"Saved!",ac:"Account security",aU:"New username",aC:"Current password",aN:"New password",up:"Update",chs:"Chats",nc:"+ New",slc:"Select a chat",mp:"Type a message...",nch:"No chats",pu:"Enter username:",np:"New announcement...",pb:"Publish",nn:"No news",bd2:"Grant/revoke news rights",gr:"Toggle rights",ed:"Edit",dl:"Delete",fl:"Follow",uf:"Unfollow",sm:"Message",hdn:"Hidden",rp:"Write a reply...",snd:"Send",fc:"Be first to comment",cn:"cancel",cd:"Really delete?",ep:"New text:",rpl:"Reply",nnt:"No notifications",l1:"liked your post",l2:"commented",l3:"sent a message",l4:"new announcement",cN:"Name",cT:"Title",cB:"Bio",addCeo:"Add new CEO",today:"Today",yesterday:"Yesterday",editedTag:"(edited)",editingMsg:"Editing message..."},
+ru:{slogan:"Школьная соцсеть",tag:"Раскрась школу своими мыслями!",lg:"Войти",rg:"Регистрация",na:"Нет аккаунта?",ha:"Есть аккаунт?",un:"Имя пользователя",pw:"Пароль",fn:"Полное имя",uT:"Занято",uF:"Свободно",v1:"Chalking",v2:"Новости",v3:"Профиль",v4:"Чат",v5:"Уведомления",v6:"Язык",v7:"CEO",out:"Выйти",wh:"Что нового?!",md:"Фото/Видео",ef:"Постов нет. Будьте первым!",av:"Аватар",rl:"СТАТУС",st:"Ученик",tc:"Учитель",geo:"Регион и школа",ct:"СТРАНА",rgn:"ОБЛАСТЬ",sc:"ШКОЛА",kl:"КЛАСС",c1:"Выберите страну",c2:"Выберите область",c4:"Выберите школу",c5:"Выберите класс",bd:"ДЕНЬ РОЖДЕНИЯ",hd:"Скрыть",ht:"СЕРДЦЕ",hA:"Свободен(а)",hC:"Всё сложно",hL:"Занят(а)",hP:"Секрет",sv:"Сохранить",svd:"Сохранено!",ac:"Безопасность",aU:"Новый username",aC:"Текущий пароль",aN:"Новый пароль",up:"Обновить",chs:"Чаты",nc:"+ Новый",slc:"Выберите чат",mp:"Сообщение...",nch:"Чатов нет",pu:"Введите username:",np:"Новое объявление...",pb:"Опубликовать",nn:"Новостей нет",bd2:"Право на новости",gr:"Переключить право",ed:"Изменить",dl:"Удалить",fl:"Подписаться",uf:"Отписаться",sm:"Написать",hdn:"Скрыто",rp:"Ответ...",snd:"Отправить",cn:"отмена",fc:"Будьте первым",cd:"Точно удалить?",ep:"Новый текст:",rpl:"Ответить",nnt:"Уведомлений нет",l1:"понравился ваш пост",l2:"комментировал",l3:"отправил сообщение",l4:"новое объявление",cN:"Имя",cT:"Должность",cB:"Био",addCeo:"Добавить нового CEO",today:"Сегодня",yesterday:"Вчера",editedTag:"(изменено)",editingMsg:"Редактирование сообщения..."}};
 function t(k){return (TR[LANG]&&TR[LANG][k])||TR.uz[k]||k}
 
 var HO='<svg class="w-5 h-5 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
@@ -449,15 +455,15 @@ function lkH(p){return (p.my_status===1?HF:HO)+' '+p.likes_count}
 function rPost(p){
  var m="";
  if(p.media_base64&&p.media_type==="video")m='<video src="'+p.media_base64+'" controls preload="none" class="mt-2 rounded-2xl border brd max-h-96 w-full"></video>';
- else if(p.media_base64)m='<img src="'+p.media_base64+'" loading="lazy" class="mt-2 rounded-2xl border brd max-h-96 object-contain">';
+ else if(p.media_base64)m='<img src="'+p.media_base64+'" loading="lazy" class="mt-2 rounded-2xl border brd w-full max-h-96 object-contain bg-black/20">';
  var own=p.user_id===me.id?' <span class="text-xs text-gray-500"><span class="cursor-pointer hover:text-sky-500" onclick="edPost('+p.id+')">'+t("ed")+'</span> · <span class="cursor-pointer hover:text-red-400" onclick="dlPost('+p.id+')">'+t("dl")+'</span></span>':"";
- return '<div class="pc border-b brd p-4 anim"><div class="flex gap-3">'+
- '<img src="'+ava(p.avatar_base64)+'" onclick="openProfile(\''+p.username+'\')" class="w-11 h-11 rounded-full object-cover cursor-pointer bg-neutral-800">'+
- '<div class="flex-1 min-w-0"><div class="flex items-center gap-2 flex-wrap">'+
+ return '<div class="pc border-b brd p-3 sm:p-4 anim"><div class="flex gap-2.5 sm:gap-3">'+
+ '<img src="'+ava(p.avatar_base64)+'" onclick="openProfile(\''+p.username+'\')" class="w-9 h-9 sm:w-11 sm:h-11 rounded-full object-cover cursor-pointer bg-neutral-800 shrink-0">'+
+ '<div class="flex-1 min-w-0"><div class="flex items-center gap-1.5 sm:gap-2 flex-wrap text-[13px] sm:text-base">'+
  '<span class="font-bold cursor-pointer hover:underline" onclick="openProfile(\''+p.username+'\')">'+esc(p.fullname)+bdg(p.username,p.can_post_news)+'</span>'+
- '<span class="text-gray-500 text-sm">@'+p.username+'</span><span class="text-gray-600 text-xs">'+(p.timestamp||"").slice(0,16).replace("T"," ")+'</span>'+own+'</div>'+
- '<p id="pt-'+p.id+'" class="mt-1 whitespace-pre-wrap break-words">'+lm(esc(p.content))+'</p>'+m+
- '<div class="flex gap-8 mt-3 text-sm items-center">'+
+ '<span class="text-gray-500 text-xs sm:text-sm">@'+p.username+'</span><span class="text-gray-600 text-[10px] sm:text-xs">'+(p.timestamp||"").slice(0,16).replace("T"," ")+'</span>'+own+'</div>'+
+ '<p id="pt-'+p.id+'" class="mt-1 text-[14px] sm:text-[15px] whitespace-pre-wrap break-words">'+lm(esc(p.content))+'</p>'+m+
+ '<div class="flex gap-6 sm:gap-8 mt-3 text-sm items-center">'+
  '<button id="lk-'+p.id+'" onclick="react('+p.id+')" class="'+(p.my_status===1?'text-pink-500':'text-gray-500')+' hover:text-pink-500">'+lkH(p)+'</button>'+
  '<button onclick="tglC('+p.id+')" class="text-gray-500 hover:text-sky-500">\u{1F4AC} '+p.comments_count+'</button></div>'+
  '<div id="cm-'+p.id+'" class="hide mt-3 border-t brd pt-3"><div id="cl-'+p.id+'" class="space-y-3 mb-3"></div>'+
@@ -493,7 +499,7 @@ function tglC(id){var b=$("cm-"+id);if(b.classList.contains("hide")){b.classList
 async function loadCmts(id){try{var l=await api("/comments?post_id="+id);
  function one(c,r){var canDel=(c.username===me.username||me.username==="boss");
   var delBtn=canDel?' · <span class="cursor-pointer text-gray-500 hover:text-red-400 font-semibold" onclick="delCmt('+id+','+c.id+')">'+t("dl")+'</span>':"";
-  return '<div class="'+(r?'ml-8 border-l-2 border-neutral-800 pl-3':'')+'"><div class="flex gap-2">'+
+  return '<div class="'+(r?'ml-5 sm:ml-8 border-l-2 border-neutral-800 pl-2 sm:pl-3':'')+'"><div class="flex gap-2">'+
   '<img src="'+ava(c.avatar_base64)+'" class="w-7 h-7 rounded-full object-cover bg-neutral-800 cursor-pointer" onclick="openProfile(\''+c.username+'\')">'+
   '<div class="flex-1 min-w-0"><span class="font-bold text-sm cursor-pointer hover:underline" onclick="openProfile(\''+c.username+'\')">'+esc(c.fullname)+bdg(c.username,c.can_post_news)+'</span>'+
   ' <span class="text-gray-500 text-xs">@'+c.username+'</span><p class="text-sm break-words">'+lm(esc(c.content))+'</p>'+
@@ -545,26 +551,56 @@ async function loadChatUsers(){try{
  var us=await api("/chat/active_users?user_id="+me.id);
  if(!us.length){$("chatUsers").innerHTML='<p class="text-center text-gray-600 text-xs p-4">'+t("nch")+'</p>';return}
  var h="";us.forEach(function(u){
+  var badge=(u.unread_count>0)?'<span class="ml-auto shrink-0 bg-sky-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">'+u.unread_count+'</span>':"";
   h+='<div onclick="openChat(\''+u.username+'\')" class="flex items-center gap-2 p-3 hover:bg-neutral-900 cursor-pointer '+(partner===u.username?'bg-sky-500/10':'')+'">'+
-  '<img src="'+ava(u.avatar_base64)+'" class="w-10 h-10 rounded-full object-cover bg-neutral-800">'+
-  '<div class="min-w-0 flex-1"><p class="text-xs font-bold truncate">'+esc(u.fullname)+bdg(u.username,u.can_post_news)+'</p>'+
-  '<p class="text-xs text-gray-500 truncate">'+esc(u.last_message||"@"+u.username)+'</p></div></div>'});
+  '<img src="'+ava(u.avatar_base64)+'" class="w-10 h-10 rounded-full object-cover bg-neutral-800 shrink-0">'+
+  '<div class="min-w-0 flex-1 hidden sm:block"><p class="text-xs font-bold truncate">'+esc(u.fullname)+bdg(u.username,u.can_post_news)+'</p>'+
+  '<p class="text-xs text-gray-500 truncate">'+esc(u.last_message||"@"+u.username)+'</p></div>'+badge+'</div>'});
  $("chatUsers").innerHTML=h}catch(e){alert(e.message)}}
 function newChat(){var u=prompt(t("pu"));if(u)openChat(u.trim().toLowerCase().replace(/^@/,""))}
-async function openChat(u){partner=u;sh("chBar");await loadHist(true);loadChatUsers()}
+async function openChat(u){partner=u;sh("chBar");hd("chEditBar");editingMsgId=null;await loadHist(true)}
+function dayLabel(ts){
+ var d=new Date((ts||"").replace(" ","T")+"Z"),now=new Date();
+ var sameDay=function(a,b){return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate()};
+ var yest=new Date(now);yest.setDate(now.getDate()-1);
+ if(sameDay(d,now))return t("today");
+ if(sameDay(d,yest))return t("yesterday");
+ return d.toLocaleDateString()}
 async function loadHist(fs){if(!partner)return;try{
  var d=await api("/chat/history?user_id="+me.id+"&partner_username="+encodeURIComponent(partner));
  $("chHead").innerHTML='<div class="flex items-center gap-2 cursor-pointer" onclick="openProfile(\''+d.partner.username+'\')">'+
  '<img src="'+ava(d.partner.avatar_base64)+'" class="w-8 h-8 rounded-full object-cover bg-neutral-800">'+
  '<div><p class="font-bold text-white text-sm">'+esc(d.partner.fullname)+bdg(d.partner.username,d.partner.can_post_news)+'</p>'+
  '<p class="text-xs text-sky-500">@'+d.partner.username+'</p></div></div>';
- var b=$("chMsgs"),ab=b.scrollHeight-b.scrollTop-b.clientHeight<60,h="";
+ var b=$("chMsgs"),ab=b.scrollHeight-b.scrollTop-b.clientHeight<60,h="",lastDay="",lastSender=null;
  d.messages.forEach(function(m){var mn=m.sender_id===me.id;
-  h+='<div class="flex '+(mn?'justify-end':'justify-start')+'"><div class="max-w-[72%] px-4 py-2 text-sm break-words rounded-2xl '+(mn?'bb text-white rounded-br-md':'bg-neutral-800 rounded-bl-md')+'">'+
-  esc(m.message)+'<span class="text-[10px] opacity-60 ml-2">'+(m.timestamp||"").slice(11,16)+'</span></div></div>'});
- b.innerHTML=h;if(fs||ab)b.scrollTop=b.scrollHeight}catch(e){alert(e.message);partner=null}}
+  var dl=dayLabel(m.timestamp);
+  if(dl!==lastDay){h+='<div class="flex justify-center my-3"><span class="text-[10px] font-bold text-gray-400 bg-neutral-900 border brd rounded-full px-3 py-1">'+dl+'</span></div>';lastDay=dl;lastSender=null}
+  var grouped=(lastSender===m.sender_id);lastSender=m.sender_id;
+  var img=m.image_base64?'<img src="'+m.image_base64+'" class="rounded-xl mb-1 max-w-full max-h-64 object-cover">':"";
+  var editedTag=m.edited?' <span class="opacity-60 italic">'+t("editedTag")+'</span>':"";
+  var ticks=mn?(' <span class="'+(m.is_read?'text-sky-300':'opacity-60')+'">'+(m.is_read?'\u2713\u2713':'\u2713')+'</span>'):"";
+  var ownBtns=mn?'<div class="flex gap-2.5 justify-end mt-0.5 text-[10px] text-gray-500">'+
+   '<span class="cursor-pointer hover:text-sky-400 active:text-sky-300" onclick="startEditMsg('+m.id+',\''+esc(m.message).replace(/'/g,"\\'")+'\')">'+t("ed")+'</span>'+
+   '<span class="cursor-pointer hover:text-red-400 active:text-red-300" onclick="delMsg('+m.id+')">'+t("dl")+'</span></div>':"";
+  h+='<div class="flex '+(mn?'justify-end':'justify-start')+' '+(grouped?'mt-0.5':'mt-2.5')+'">'+
+  '<div class="max-w-[78%] sm:max-w-[72%]">'+
+  '<div class="px-3.5 py-2 text-[14px] sm:text-sm break-words rounded-2xl '+(mn?'bb text-white '+(grouped?'rounded-br-md':'rounded-br-md'):'bg-neutral-800 '+(grouped?'rounded-bl-md':'rounded-bl-md'))+'">'+
+  img+(m.message?esc(m.message):'')+editedTag+
+  '<span class="text-[10px] opacity-60 ml-2 whitespace-nowrap">'+(m.timestamp||"").slice(11,16)+'</span>'+ticks+'</div>'+ownBtns+'</div></div>'});
+ b.innerHTML=h;if(fs||ab)b.scrollTop=b.scrollHeight;loadChatUsers()}catch(e){alert(e.message);partner=null}}
+var editingMsgId=null;
+function startEditMsg(id,txt){editingMsgId=id;var i=$("chInp");i.value=txt;i.focus();
+ i.setSelectionRange(i.value.length,i.value.length);sh("chEditBar")}
+function cancelEditMsg(){editingMsgId=null;$("chInp").value="";hd("chEditBar")}
+async function delMsg(id){if(!confirm(t("cd")))return;
+ try{await api("/chat/delete",pj({user_id:me.id,message_id:id}));loadHist(false)}catch(e){alert(e.message)}}
 async function sendMsg(){var i=$("chInp"),m=i.value.trim();if(!m||!partner)return;
- try{await api("/chat/send",pj({sender_id:me.id,receiver_username:partner,message:m}));i.value="";loadHist(true);loadChatUsers()}catch(e){alert(e.message)}}
+ try{
+  if(editingMsgId){await api("/chat/edit",pj({user_id:me.id,message_id:editingMsgId,message:m}));cancelEditMsg()}
+  else{await api("/chat/send",pj({sender_id:me.id,receiver_username:partner,message:m}))}
+  i.value="";loadHist(true)
+ }catch(e){alert(e.message)}}
 /* NEWS */
 function nlkH(n){return (n.my_like?HF:HO)+' '+n.likes_count}
 async function loadNews(){try{
@@ -574,12 +610,12 @@ async function loadNews(){try{
  ns.forEach(function(n){nCache[n.id]=n;
   var mine=(n.author===me.username)||(me.username==="boss");
   var own=mine?' <span class="text-xs text-gray-500"><span class="cursor-pointer hover:text-sky-500" onclick="edNews('+n.id+')">'+t("ed")+'</span> · <span class="cursor-pointer hover:text-red-400" onclick="dlNews('+n.id+')">'+t("dl")+'</span></span>':"";
-  h+='<div class="pc border-b brd p-4 anim"><div class="flex items-center gap-2 flex-wrap">'+
+  h+='<div class="pc border-b brd p-3 sm:p-4 anim"><div class="flex items-center gap-1.5 sm:gap-2 flex-wrap text-[13px] sm:text-base">'+
   '<span class="font-bold">\u{1F4E2} '+t("v2")+'</span>'+
   (n.author?'<span class="mention" onclick="openProfile(\''+n.author+'\')">@'+n.author+'</span>':'')+
-  '<span class="text-gray-600 text-xs">'+(n.timestamp||"").slice(0,16).replace("T"," ")+'</span>'+own+'</div>'+
-  '<p id="nt-'+n.id+'" class="mt-1 whitespace-pre-wrap break-words">'+lm(esc(n.title))+'</p>'+
-  '<div class="flex gap-8 mt-3 text-sm items-center">'+
+  '<span class="text-gray-600 text-[10px] sm:text-xs">'+(n.timestamp||"").slice(0,16).replace("T"," ")+'</span>'+own+'</div>'+
+  '<p id="nt-'+n.id+'" class="mt-1 text-[14px] sm:text-[15px] whitespace-pre-wrap break-words">'+lm(esc(n.title))+'</p>'+
+  '<div class="flex gap-6 sm:gap-8 mt-3 text-sm items-center">'+
   '<button id="nlk-'+n.id+'" onclick="nReact('+n.id+')" class="'+(n.my_like?'text-pink-500':'text-gray-500')+' hover:text-pink-500">'+nlkH(n)+'</button>'+
   '<button onclick="tglNC('+n.id+')" class="text-gray-500 hover:text-sky-500">\u{1F4AC} '+n.comments_count+'</button></div>'+
   '<div id="ncm-'+n.id+'" class="hide mt-3 border-t brd pt-3"><div id="ncl-'+n.id+'" class="space-y-3 mb-3"></div><div class="flex gap-2">'+
@@ -727,6 +763,7 @@ function applyLang(){
  $("tSv").textContent=t("sv");$("tAc").textContent=t("ac");
  $("aU").placeholder=t("aU");$("aC").placeholder=t("aC");$("aN").placeholder=t("aN");$("tAB").textContent=t("up");
  $("tCh").textContent=t("chs");$("tNC").textContent=t("nc");$("chHead").textContent=t("slc");$("chInp").placeholder=t("mp");
+ $("tEditing").textContent=t("editingMsg");
  $("nInp").placeholder=t("np");$("tPub").textContent=t("pb");$("tBD").textContent=t("bd2");$("tGr").textContent=t("gr");
  $("ceoEB").textContent=t("ed");$("tCS").textContent=t("sv");
  $("fNm").placeholder=t("cN");$("fTt").placeholder=t("cT");$("fBi").placeholder=t("cB");
