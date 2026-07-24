@@ -28,7 +28,7 @@ def init():
       post_id INTEGER NOT NULL, is_like INTEGER NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP);
     CREATE UNIQUE INDEX IF NOT EXISTS iup ON likes(user_id, post_id);
     CREATE TABLE IF NOT EXISTS chat_messages(id INTEGER PRIMARY KEY AUTOINCREMENT, sender_id INTEGER NOT NULL,
-      receiver_id INTEGER NOT NULL, message TEXT NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP);
+      receiver_id INTEGER NOT NULL, message TEXT NOT NULL, image_base64 TEXT, timestamp TEXT DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE IF NOT EXISTS follows(follower_id INTEGER NOT NULL, following_id INTEGER NOT NULL,
       PRIMARY KEY(follower_id, following_id));
     CREATE TABLE IF NOT EXISTS school_news(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
@@ -48,6 +48,13 @@ def init():
                   ("Ilyosbek Siddiqjonov", "CEO Founder",
                    "Chalker — o'quvchilar va o'qituvchilar uchun zamonaviy maktab ijtimoiy tarmog'i.",
                    "@ilyos6ee", "@ilyos6ee", "@boss"))
+    existing_cols = [r["name"] for r in c.execute("PRAGMA table_info(chat_messages)").fetchall()]
+    if "image_base64" not in existing_cols:
+        c.execute("ALTER TABLE chat_messages ADD COLUMN image_base64 TEXT")
+    if "is_read" not in existing_cols:
+        c.execute("ALTER TABLE chat_messages ADD COLUMN is_read INTEGER DEFAULT 0")
+    if "edited" not in existing_cols:
+        c.execute("ALTER TABLE chat_messages ADD COLUMN edited INTEGER DEFAULT 0")
     c.commit(); c.close()
 
 init()
@@ -74,7 +81,11 @@ class LikeReq(BaseModel):
 class CommentCreate(BaseModel):
     user_id: int; post_id: int; content: str; parent_id: Optional[int] = None
 class ChatSend(BaseModel):
-    sender_id: int; receiver_username: str; message: str
+    sender_id: int; receiver_username: str; message: str = ""; image_base64: Optional[str] = None
+class ChatEdit(BaseModel):
+    user_id: int; message_id: int; message: str
+class ChatDel(BaseModel):
+    user_id: int; message_id: int
 class FollowReq(BaseModel):
     follower_id: int; following_username: str
 class NewsCreate(BaseModel):
@@ -262,12 +273,31 @@ def comment_delete(b: CommentDel):
 
 @app.post("/api/chat/send")
 def chat_send(b: ChatSend):
-    if not b.message.strip(): return err("Xabar bo'sh!")
+    if not b.message.strip() and not b.image_base64: return err("Xabar bo'sh!")
     c = db()
     r = c.execute("SELECT id FROM users WHERE username=?", (clean_u(b.receiver_username),)).fetchone()
     if not r: c.close(); return err("Qabul qiluvchi topilmadi!", 404)
-    c.execute("INSERT INTO chat_messages(sender_id,receiver_id,message) VALUES(?,?,?)",
-              (b.sender_id, r["id"], b.message.strip()))
+    c.execute("INSERT INTO chat_messages(sender_id,receiver_id,message,image_base64) VALUES(?,?,?,?)",
+              (b.sender_id, r["id"], b.message.strip(), b.image_base64))
+    c.commit(); c.close(); return {"success": True}
+
+@app.post("/api/chat/edit")
+def chat_edit(b: ChatEdit):
+    if not b.message.strip(): return err("Xabar bo'sh!")
+    c = db()
+    r = c.execute("SELECT sender_id FROM chat_messages WHERE id=?", (b.message_id,)).fetchone()
+    if not r: c.close(); return err("Xabar topilmadi!", 404)
+    if r["sender_id"] != b.user_id: c.close(); return err("Ruxsat yo'q!", 403)
+    c.execute("UPDATE chat_messages SET message=?,edited=1 WHERE id=?", (b.message.strip(), b.message_id))
+    c.commit(); c.close(); return {"success": True}
+
+@app.post("/api/chat/delete")
+def chat_delete(b: ChatDel):
+    c = db()
+    r = c.execute("SELECT sender_id FROM chat_messages WHERE id=?", (b.message_id,)).fetchone()
+    if not r: c.close(); return err("Xabar topilmadi!", 404)
+    if r["sender_id"] != b.user_id: c.close(); return err("Ruxsat yo'q!", 403)
+    c.execute("DELETE FROM chat_messages WHERE id=?", (b.message_id,))
     c.commit(); c.close(); return {"success": True}
 
 @app.get("/api/chat/history")
@@ -276,6 +306,9 @@ def chat_history(user_id: int, partner_username: str):
     p = c.execute("SELECT id,username,fullname,avatar_base64,can_post_news FROM users WHERE username=?",
                   (clean_u(partner_username),)).fetchone()
     if not p: c.close(); return err("Foydalanuvchi topilmadi!", 404)
+    c.execute("UPDATE chat_messages SET is_read=1 WHERE sender_id=? AND receiver_id=? AND is_read=0",
+              (p["id"], user_id))
+    c.commit()
     rows = c.execute("""SELECT * FROM chat_messages WHERE (sender_id=? AND receiver_id=?)
         OR (sender_id=? AND receiver_id=?) ORDER BY id ASC""",
         (user_id, p["id"], p["id"], user_id)).fetchall()
@@ -286,10 +319,11 @@ def chat_users(user_id: int):
     c = db()
     rows = c.execute("""SELECT u.id,u.username,u.fullname,u.avatar_base64,u.can_post_news,
         (SELECT message FROM chat_messages m WHERE (m.sender_id=u.id AND m.receiver_id=?)
-         OR (m.sender_id=? AND m.receiver_id=u.id) ORDER BY m.id DESC LIMIT 1) last_message
+         OR (m.sender_id=? AND m.receiver_id=u.id) ORDER BY m.id DESC LIMIT 1) last_message,
+        (SELECT COUNT(*) FROM chat_messages m WHERE m.sender_id=u.id AND m.receiver_id=? AND m.is_read=0) unread_count
         FROM users u WHERE u.id IN (SELECT sender_id FROM chat_messages WHERE receiver_id=?
         UNION SELECT receiver_id FROM chat_messages WHERE sender_id=?) AND u.id!=?""",
-        (user_id, user_id, user_id, user_id, user_id)).fetchall()
+        (user_id, user_id, user_id, user_id, user_id, user_id)).fetchall()
     c.close(); return [dict(r) for r in rows]
 
 @app.post("/api/users/follow")
