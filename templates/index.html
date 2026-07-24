@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>chalker</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+:root{
+ --sky:#1d9bf0;--sky-dim:#0d7dd6;--sky-glow:rgba(29,155,240,.35);
+ --bg:#000;--surface:#0a0b0d;--surface-2:#111317;--brd:#2f3336;--brd-soft:#23262b;
+ --txt:#e7e9ea;--txt-dim:#71767b;--pink:#f91880;--green:#00ba7c;--amber:#fbbf24;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;letter-spacing:.1px;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background:
+ radial-gradient(ellipse 900px 500px at 12% -10%, rgba(29,155,240,.10), transparent 60%),
+ radial-gradient(ellipse 700px 500px at 110% 10%, rgba(249,24,128,.06), transparent 55%),
+ radial-gradient(ellipse 600px 500px at 50% 120%, rgba(0,186,124,.05), transparent 55%)}
+#authView,#appView{position:relative;z-index:1}
+.brd{border-color:var(--brd)}
+
+/* buttons */
+.bb{background:linear-gradient(135deg,#3fb6ff 0%,var(--sky) 45%,var(--sky-dim) 100%);position:relative;box-shadow:0 2px 14px -2px var(--sky-glow),inset 0 1px 0 rgba(255,255,255,.25);will-change:transform}
+.bb:hover{filter:brightness(1.12);box-shadow:0 6px 22px -2px var(--sky-glow),inset 0 1px 0 rgba(255,255,255,.3);transform:translateY(-1px)}
+.bb:active{transform:translateY(0) scale(.97);filter:brightness(.98)}
+button{transition:transform .18s cubic-bezier(.2,.8,.3,1),filter .18s ease,background-color .18s ease,box-shadow .18s ease,border-color .18s ease,color .18s ease,opacity .18s ease}
+button:active{transform:scale(.96)}
+
+/* scrollbars */
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--brd);border-radius:99px;border:2px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:#3d4146;background-clip:padding-box}
+
+.mention{color:var(--sky);cursor:pointer;font-weight:700;transition:color .15s ease}
+.mention:hover{color:#5cb8ff;text-decoration:underline}
+
+input,textarea,select{outline:none;transition:border-color .2s ease,box-shadow .2s ease,background-color .2s ease;color:var(--txt)}
+input:focus,textarea:focus,select:focus{border-color:var(--sky)!important;box-shadow:0 0 0 3.5px rgba(29,155,240,.16)}
+input::placeholder,textarea::placeholder{color:#5b6167}
+select{cursor:pointer}
+.hide{display:none!important}
+
+@keyframes fu{from{opacity:0;transform:translateY(14px) scale(.99)}to{opacity:1;transform:none}}
+@keyframes ltr{0%,100%{transform:none}50%{transform:translateY(-6px)}}
+@keyframes popIn{0%{opacity:0;transform:scale(.92) translateY(10px)}100%{opacity:1;transform:none}}
+@keyframes glowPulse{0%,100%{box-shadow:0 0 0 0 rgba(29,155,240,.35)}50%{box-shadow:0 0 0 6px rgba(29,155,240,0)}}
+@keyframes heartPop{0%{transform:scale(1)}35%{transform:scale(1.35)}60%{transform:scale(.92)}100%{transform:scale(1)}}
+@keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeScaleIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+
+.anim{animation:fu .45s cubic-bezier(.2,.7,.3,1) both}
+.logo{filter:drop-shadow(0 0 16px rgba(6,182,212,.8)) drop-shadow(0 0 34px rgba(29,155,240,.25))}
+.logo span{display:inline-block;font-weight:800;letter-spacing:.02em;animation:ltr 2.4s ease-in-out infinite;background:linear-gradient(135deg,#34d399 0%,#06b6d4 55%,#0ea5e9 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* nav items */
+.nv{position:relative;overflow:hidden;color:#d6d9db}
+.nv::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(29,155,240,.14),transparent 70%);opacity:0;transition:opacity .2s ease}
+.nv:hover{background:#16181c;color:#fff;transform:translateX(2px)}
+.nv:hover::before{opacity:1}
+.nv:active{transform:translateX(2px) scale(.98)}
+
+/* post/news cards */
+.pc{position:relative;transition:background-color .18s ease}
+.pc:hover{background:#080909}
+.pc::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,transparent,rgba(47,51,54,.7) 15%,rgba(47,51,54,.7) 85%,transparent)}
+
+.dot{width:9px;height:9px;background:radial-gradient(circle at 30% 30%,#ff5a72,var(--pink) 70%);border-radius:50%;display:inline-block;box-shadow:0 0 0 3px rgba(249,24,128,.18);animation:glowPulse 1.8s ease-in-out infinite}
+
+.inp{width:100%;background:var(--surface);border:1px solid var(--brd);border-radius:.9rem;padding:.8rem .9rem;font-size:.875rem;transition:border-color .2s ease,box-shadow .2s ease,background-color .2s ease}
+.inp:hover{border-color:#43484d}
+.inp:focus{background:#0d0f12}
+
+.panel{background:linear-gradient(180deg,#0c0d10,#050506);box-shadow:0 12px 40px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.05);border-color:var(--brd-soft)!important}
+.nvic{width:24px;height:24px;flex:none;transition:transform .2s ease}
+.nv:hover .nvic{transform:scale(1.08)}
+
+.lang-card{display:flex;align-items:center;gap:1rem;width:100%;border:1px solid var(--brd);border-radius:1.25rem;padding:1.1rem 1.3rem;text-align:left;font-weight:700;font-size:1.05rem;background:linear-gradient(180deg,#0c0d10,#050506);box-shadow:0 8px 26px rgba(0,0,0,.5);transition:border-color .2s ease,transform .2s ease,box-shadow .2s ease}
+.lang-card:hover{border-color:var(--sky);transform:translateY(-3px);box-shadow:0 14px 38px rgba(29,155,240,.16)}
+.lang-card:active{transform:translateY(-1px) scale(.99)}
+
+/* avatars get a subtle ring on hover for a premium feel */
+img[class*="rounded-full"]{transition:box-shadow .2s ease,transform .15s ease,filter .2s ease}
+img[class*="rounded-full"][onclick]{cursor:pointer}
+img[class*="rounded-full"][onclick]:hover{box-shadow:0 0 0 3px rgba(29,155,240,.35);transform:translateY(-1px)}
+
+/* like button pop animation whenever its content updates to filled heart */
+button[id^="lk-"]:active svg,button[id^="nlk-"]:active svg{animation:heartPop .38s ease}
+
+/* modal */
+#pModal{backdrop-filter:blur(6px) saturate(1.2);-webkit-backdrop-filter:blur(6px) saturate(1.2);transition:opacity .2s ease}
+#pModal>div{animation:popIn .28s cubic-bezier(.2,.8,.3,1) both}
+
+/* sticky header blur is already inline; add subtle bottom hairline glow */
+.border-b.brd.p-5.text-center{position:relative}
+.border-b.brd.p-5.text-center::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:linear-gradient(90deg,transparent,rgba(29,155,240,.5),transparent)}
+
+/* ---------- CEO "+" add button ---------- */
+#ceoAddBtn{transition:transform .25s cubic-bezier(.2,.8,.3,1),filter .2s ease,box-shadow .2s ease}
+#ceoAddBtn:hover{transform:rotate(90deg) scale(1.08);filter:brightness(1.15)}
+#ceoAddBtn:active{transform:rotate(90deg) scale(.94)}
+#ceoExtra>div{transition:border-color .2s ease,transform .2s ease}
+#ceoExtra>div:hover{border-color:#43484d;transform:translateY(-2px)}
+button.border.brd{transition:background-color .18s ease,border-color .18s ease,transform .18s ease,color .18s ease}
+button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
+
+::selection{background:rgba(29,155,240,.35);color:#fff}
+
+/* ---------- pro-level nav active state ---------- */
+.nv.nvactive{background:linear-gradient(90deg,rgba(29,155,240,.18),rgba(29,155,240,.03) 80%);color:#fff;box-shadow:inset 3px 0 0 0 var(--sky)}
+.nv.nvactive::before{opacity:1}
+.nv.nvactive .nvic{filter:drop-shadow(0 0 6px rgba(29,155,240,.65))}
+
+/* ---------- view transition (fires whenever a view goes from display:none -> flex/block) ---------- */
+#view-feed,#view-news,#view-notif,#view-chat{animation:fu .35s cubic-bezier(.2,.7,.3,1) both}
+
+/* ---------- staggered reveal for list items ---------- */
+#feedList .pc:nth-child(1),#newsList .pc:nth-child(1),#ntList>div:nth-child(1){animation-delay:.02s}
+#feedList .pc:nth-child(2),#newsList .pc:nth-child(2),#ntList>div:nth-child(2){animation-delay:.06s}
+#feedList .pc:nth-child(3),#newsList .pc:nth-child(3),#ntList>div:nth-child(3){animation-delay:.10s}
+#feedList .pc:nth-child(4),#newsList .pc:nth-child(4),#ntList>div:nth-child(4){animation-delay:.14s}
+#feedList .pc:nth-child(5),#newsList .pc:nth-child(5),#ntList>div:nth-child(5){animation-delay:.18s}
+#feedList .pc:nth-child(6),#newsList .pc:nth-child(6),#ntList>div:nth-child(6){animation-delay:.22s}
+#feedList .pc:nth-child(7),#newsList .pc:nth-child(7),#ntList>div:nth-child(7){animation-delay:.26s}
+#feedList .pc:nth-child(8),#newsList .pc:nth-child(8),#ntList>div:nth-child(8){animation-delay:.30s}
+#feedList .pc:nth-child(n+9),#newsList .pc:nth-child(n+9),#ntList>div:nth-child(n+9){animation-delay:.32s}
+#cl-1,#cl-2{animation:none}
+[id^="cl-"]>div,[id^="ncl-"]>div{animation:fu .3s ease both}
+[id^="cl-"]>div:nth-child(1),[id^="ncl-"]>div:nth-child(1){animation-delay:.02s}
+[id^="cl-"]>div:nth-child(2),[id^="ncl-"]>div:nth-child(2){animation-delay:.06s}
+[id^="cl-"]>div:nth-child(3),[id^="ncl-"]>div:nth-child(3){animation-delay:.10s}
+[id^="cl-"]>div:nth-child(n+4),[id^="ncl-"]>div:nth-child(n+4){animation-delay:.12s}
+
+/* ---------- chat bubbles pop in ---------- */
+#chMsgs>div{animation:fadeScaleIn .28s cubic-bezier(.2,.8,.3,1) both}
+
+/* ---------- responsive scale for headline logo/tag ---------- */
+#heroLogo{font-size:1.9rem;line-height:1}
+@media(min-width:480px){#heroLogo{font-size:2.4rem}}
+@media(min-width:768px){#heroLogo{font-size:3rem}}
+#authLogo{font-size:2.1rem;line-height:1}
+@media(min-width:400px){#authLogo{font-size:2.6rem}}
+@media(min-width:640px){#authLogo{font-size:3rem}}
+
+/* ---------- icon-rail sidebar on phones/tablets ---------- */
+@media(max-width:767.98px){
+ #navBox .nv{border-radius:14px}
+ #navBox .nvic{width:23px;height:23px}
+}
+
+/* ---------- mobile bottom-nav companion (feed compose / chat input stay usable) ---------- */
+@media(max-width:639.98px){
+ .panel{box-shadow:0 8px 26px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.04)}
+}
+</style>
+</head>
+<body>
+
+<div id="authView" class="hide min-h-screen flex items-center justify-center p-4">
+ <div class="w-full max-w-md border brd rounded-2xl sm:rounded-3xl p-5 sm:p-8 anim panel">
+  <div id="authLogo" class="text-center text-5xl mb-1"></div>
+  <p id="tSlogan" class="text-center text-gray-500 mb-7 text-sm"></p>
+  <div id="loginForm">
+   <input id="lU" class="inp mb-3">
+   <div class="relative mb-4"><input id="lP" type="password" class="inp pr-12">
+    <button type="button" id="eL" onclick="tEye('lP','eL')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"></button></div>
+   <button id="tLB" onclick="doLogin()" class="w-full bb text-white font-bold rounded-full py-3"></button>
+   <p class="text-center text-gray-500 text-sm mt-5"><span id="tNA"></span> <span id="tGR" class="mention" onclick="tAuth(false)"></span></p>
+  </div>
+  <div id="registerForm" class="hide">
+   <input id="rU" oninput="chkU('rU','rH')" class="inp"><p id="rH" class="text-xs h-4 mt-1 mb-2"></p>
+   <input id="rF" class="inp mb-3">
+   <div class="relative mb-4"><input id="rP" type="password" class="inp pr-12">
+    <button type="button" id="eR" onclick="tEye('rP','eR')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"></button></div>
+   <button id="tRB" onclick="doRegister()" class="w-full bb text-white font-bold rounded-full py-3"></button>
+   <p class="text-center text-gray-500 text-sm mt-5"><span id="tHA"></span> <span id="tGL" class="mention" onclick="tAuth(true)"></span></p>
+  </div>
+ </div>
+</div>
+
+<div id="appView" class="hide w-full flex min-h-screen">
+ <aside class="w-[74px] md:w-64 shrink-0 border-r brd p-2.5 md:p-4 flex flex-col sticky top-0 h-screen panel transition-[width] duration-300 z-20">
+  <div class="md:hidden flex items-center justify-center h-10 w-10 mx-auto mb-3 rounded-xl bg-gradient-to-br from-emerald-400 via-cyan-400 to-sky-500 text-black font-extrabold text-lg shadow-lg shadow-sky-500/20">C</div>
+  <div id="sideLogo" class="hidden md:block text-4xl px-2"></div>
+  <p id="sideTag" class="hidden md:block text-[10px] text-gray-500 px-2 mb-4"></p>
+  <nav id="navBox" class="space-y-1 flex-1"></nav>
+  <div class="border brd rounded-2xl p-2 md:p-3 flex flex-col md:flex-row items-center gap-1.5 md:gap-2">
+   <img id="sAv" class="w-9 h-9 rounded-full object-cover bg-neutral-800 shrink-0">
+   <div class="hidden md:block flex-1 min-w-0"><p id="sNm" class="font-bold text-xs truncate"></p><p id="sUn" class="text-gray-500 text-xs truncate"></p></div>
+   <button id="tOut" onclick="logout()" class="text-red-400 text-[10px] md:text-xs font-bold"></button>
+  </div>
+ </aside>
+
+ <main class="flex-1 border-r brd min-w-0">
+  <div class="border-b brd p-3 sm:p-4 md:p-5 text-center sticky top-0 z-10" style="background:rgba(0,0,0,.85);backdrop-filter:blur(10px)">
+   <div id="heroLogo" class="text-5xl"></div><p id="heroTag" class="text-[11px] sm:text-xs text-gray-500 mt-1 font-bold px-2"></p>
+  </div>
+
+  <div id="view-feed">
+   <div class="border-b brd p-3 sm:p-4"><div class="flex gap-2.5 sm:gap-3">
+    <img id="cAv" class="w-11 h-11 rounded-full object-cover bg-neutral-800">
+    <div class="flex-1">
+     <textarea id="pTxt" rows="2" class="w-full bg-transparent text-lg resize-none"></textarea>
+     <div id="mBox" class="hide mt-2 relative">
+      <img id="mImg" class="hide max-h-72 rounded-2xl border brd">
+      <video id="mVid" class="hide max-h-72 rounded-2xl border brd w-full" controls></video>
+      <button onclick="clrMedia()" class="absolute top-2 right-2 bg-black/70 rounded-full w-8 h-8 font-bold">&#10005;</button>
+     </div>
+     <div class="flex items-center justify-between mt-2 border-t brd pt-3">
+      <label class="cursor-pointer text-sky-500 rounded-full px-3 py-1.5 text-sm font-semibold hover:bg-sky-500/10">
+       &#128444; <span id="tMd"></span><input id="mInp" type="file" accept="image/*,video/*" class="hide" onchange="pickMedia(this)"></label>
+      <button onclick="createPost()" class="bb text-white font-bold rounded-full px-7 py-2">Chalk</button>
+     </div>
+    </div>
+   </div></div>
+   <div id="feedList"></div>
+  </div>
+
+  <div id="view-news" class="hide">
+   <div id="newsComposer" class="hide border-b brd p-4">
+    <textarea id="nInp" rows="2" class="inp resize-none"></textarea>
+    <button id="tPub" onclick="pubNews()" class="bb text-white text-sm font-bold rounded-full px-5 py-2 mt-2"></button>
+   </div>
+   <div id="newsList"></div>
+  </div>
+
+  <div id="view-notif" class="hide"><div id="ntList" class="p-3 space-y-2"></div></div>
+
+  <div id="view-profile" class="hide"><div class="p-4 sm:p-6 max-w-lg space-y-4 anim">
+   <div class="flex items-center gap-4">
+    <img id="pAv" class="w-20 h-20 rounded-full object-cover bg-neutral-800 border-2 border-sky-500/40">
+    <label class="cursor-pointer bb text-white text-sm font-bold rounded-full px-5 py-2.5"><span id="tAvt"></span>
+     <input type="file" accept="image/*" class="hide" onchange="pickAvatar(this)"></label>
+   </div>
+   <div><label id="tFN" class="text-gray-500 text-xs font-bold"></label><input id="pFn" class="inp"></div>
+   <div><label id="tRl" class="text-gray-500 text-xs font-bold"></label>
+    <select id="pRole" class="inp"><option value="student"></option><option value="teacher"></option></select></div>
+   <div><label class="text-gray-500 text-xs font-bold">BIO</label><textarea id="pBio" rows="3" class="inp resize-none"></textarea></div>
+   <div class="border brd rounded-2xl p-4 space-y-3 panel">
+    <p id="tGeo" class="text-sm font-bold text-sky-500"></p>
+    <div><label id="tCt" class="text-gray-500 text-xs font-bold"></label><select id="pCt" onchange="onCt()" class="inp"></select></div>
+    <div><label id="tRg" class="text-gray-500 text-xs font-bold"></label><select id="pRg" onchange="onRg()" class="inp"></select></div>
+    <div><label id="tSc" class="text-gray-500 text-xs font-bold"></label><select id="pSc" onchange="onSc()" class="inp"></select></div>
+    <div><label id="tKl" class="text-gray-500 text-xs font-bold"></label><select id="pKl" class="inp"></select></div>
+   </div>
+   <div class="flex gap-3 items-end">
+    <div class="flex-1"><label id="tBd" class="text-gray-500 text-xs font-bold"></label><input id="pBd" type="date" class="inp"></div>
+    <label class="flex items-center gap-2 pb-3 text-sm text-gray-400 cursor-pointer"><input id="pHB" type="checkbox" class="accent-sky-500"><span id="tHd"></span></label>
+   </div>
+   <div><label id="tHt" class="text-gray-500 text-xs font-bold"></label>
+    <select id="pHt" class="inp"><option value="Available"></option><option value="Complicated"></option><option value="Locked"></option><option value="Private"></option></select></div>
+   <button id="tSv" onclick="saveProfile()" class="bb text-white font-bold rounded-full py-3 w-full"></button>
+   <div class="border brd rounded-2xl p-4 space-y-3 mt-6 panel">
+    <p id="tAc" class="text-sm font-bold text-amber-400"></p>
+    <input id="aU" oninput="chkU('aU','aH',me.id)" class="inp"><p id="aH" class="text-xs h-4"></p>
+    <div class="relative"><input id="aC" type="password" class="inp pr-12"><button type="button" id="e1" onclick="tEye('aC','e1')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"></button></div>
+    <div class="relative"><input id="aN" type="password" class="inp pr-12"><button type="button" id="e2" onclick="tEye('aN','e2')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"></button></div>
+    <button id="tAB" onclick="saveAccount()" class="w-full border border-amber-500/50 text-amber-400 font-bold rounded-full py-2.5 text-sm hover:bg-amber-500/10"></button>
+   </div>
+  </div></div>
+
+  <div id="view-chat" class="hide flex flex-col" style="height:calc(100vh - 120px)">
+   <div class="flex flex-1 min-h-0">
+    <div class="w-[86px] sm:w-48 md:w-56 shrink-0 border-r brd flex flex-col transition-[width] duration-300">
+     <div class="p-2 sm:p-3 border-b brd flex items-center justify-between">
+      <h2 id="tCh" class="font-bold text-sm hidden sm:block"></h2>
+      <button id="tNC" onclick="newChat()" class="bb text-white text-xs font-bold rounded-full px-2.5 sm:px-3 py-1.5 mx-auto sm:mx-0"></button>
+     </div>
+     <div id="chatUsers" class="flex-1 overflow-y-auto"></div>
+    </div>
+    <div class="flex-1 flex flex-col min-w-0">
+     <div id="chHead" class="border-b brd p-2.5 sm:p-3 text-sm text-gray-500"></div>
+     <div id="chMsgs" class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-1.5"></div>
+     <div id="chBar" class="hide p-2.5 sm:p-3 flex gap-2 items-center border-t brd">
+      <input id="chInp" onkeydown="if(event.key==='Enter')sendMsg()" class="flex-1 bg-neutral-900 border brd rounded-full px-4 sm:px-5 py-2.5 sm:py-3 text-sm">
+      <button onclick="sendMsg()" class="bb text-white rounded-full w-10 h-10 sm:w-11 sm:h-11 shrink-0 font-bold">&#10148;</button>
+     </div>
+    </div>
+   </div>
+  </div>
+
+  <div id="view-lang" class="hide p-5 sm:p-10 max-w-md mx-auto space-y-4">
+   <button onclick="setLang('uz')" class="lang-card anim"><span class="text-3xl">&#127482;&#127487;</span><span>O'zbekcha<br><span class="text-xs text-gray-500 font-normal">Uzbek tili</span></span><span class="ml-auto text-sky-500 text-xl">&#10148;</span></button>
+   <button onclick="setLang('en')" class="lang-card anim" style="animation-delay:.08s"><span class="text-3xl">&#127468;&#127463;</span><span>English<br><span class="text-xs text-gray-500 font-normal">English language</span></span><span class="ml-auto text-sky-500 text-xl">&#10148;</span></button>
+   <button onclick="setLang('ru')" class="lang-card anim" style="animation-delay:.16s"><span class="text-3xl">&#127479;&#127482;</span><span>&#1056;&#1091;&#1089;&#1089;&#1082;&#1080;&#1081;<br><span class="text-xs text-gray-500 font-normal">Russian</span></span><span class="ml-auto text-sky-500 text-xl">&#10148;</span></button>
+  </div>
+
+  <div id="view-ceo" class="hide p-4 sm:p-8 flex justify-center">
+   <div class="border brd rounded-2xl sm:rounded-3xl p-5 sm:p-8 max-w-md text-center w-full anim panel">
+    <div class="flex justify-end"><button id="ceoEB" onclick="tCeoEdit()" class="hide border brd rounded-full px-4 py-1 text-xs font-bold hover:bg-neutral-900"></button></div>
+    <div id="ceoIn" class="w-24 h-24 mx-auto rounded-full bb flex items-center justify-center text-4xl font-extrabold text-white mb-4">IS</div>
+    <div id="ceoShow">
+     <h3 id="cNm" class="text-2xl font-extrabold"></h3><p id="cTt" class="text-sky-500 font-semibold mt-1"></p>
+     <p id="cBi" class="text-gray-400 text-sm mt-4"></p>
+     <div id="cLk" class="flex flex-col items-center gap-2 mt-6 text-sm"></div>
+    </div>
+    <div id="ceoForm" class="hide text-left space-y-3 mt-2">
+     <input id="fNm" class="inp"><input id="fTt" class="inp"><textarea id="fBi" rows="4" class="inp resize-none"></textarea>
+     <input id="fTg" class="inp"><input id="fIg" class="inp"><input id="fCh" class="inp">
+     <button id="tCS" onclick="saveCeo()" class="bb text-white font-bold rounded-full py-3 w-full"></button>
+    </div>
+
+    <div id="ceoExtra" class="mt-6 space-y-4 text-left"></div>
+
+    <div id="ceoAddWrap" class="hide mt-6 pt-5 border-t brd">
+     <button id="ceoAddBtn" onclick="toggleCeoAddForm()" class="mx-auto flex items-center justify-center w-11 h-11 rounded-full bb text-white text-2xl font-bold leading-none" title="+" aria-label="+">+</button>
+     <div id="ceoAddForm" class="hide text-left space-y-3 mt-4">
+      <p id="tAddCeo" class="text-sm font-bold text-sky-500"></p>
+      <input id="acNm" class="inp"><input id="acTt" class="inp"><textarea id="acBi" rows="3" class="inp resize-none"></textarea>
+      <input id="acTg" class="inp"><input id="acIg" class="inp"><input id="acCh" class="inp">
+      <button id="tACS" onclick="addCeo()" class="bb text-white font-bold rounded-full py-3 w-full"></button>
+     </div>
+    </div>
+   </div>
+  </div>
+ </main>
+
+ <aside class="w-72 shrink-0 p-4 sticky top-0 h-screen hidden lg:block">
+  <div id="bossPanel" class="hide border brd rounded-2xl p-4 panel">
+   <h3 class="font-extrabold text-base mb-1 text-amber-400">&#128081; Boss</h3>
+   <p id="tBD" class="text-xs text-gray-500 mb-3"></p>
+   <input id="gU" placeholder="@username" class="inp mb-2">
+   <button id="tGr" onclick="grantNews()" class="w-full border border-amber-500/50 text-amber-400 font-bold rounded-full py-2 text-sm hover:bg-amber-500/10"></button>
+  </div>
+ </aside>
+</div>
+
+<div id="pModal" class="hide fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeModal()">
+ <div class="bg-black border brd rounded-2xl sm:rounded-3xl w-full max-w-sm p-5 sm:p-6 relative anim panel">
+  <button onclick="closeModal()" class="absolute top-3 right-4 text-gray-500 text-xl">&#10005;</button>
+  <div class="text-center">
+   <img id="mAv" class="w-24 h-24 rounded-full object-cover bg-neutral-800 mx-auto mb-3 border-2 border-sky-500/40">
+   <h3 id="mFn" class="text-xl font-extrabold"></h3><p id="mUn" class="text-gray-500 text-sm"></p><p id="mRl" class="text-sky-500 text-xs font-bold"></p>
+   <div class="flex justify-center gap-6 my-4 text-sm">
+    <span><b id="mFw">0</b> <span class="text-gray-500">Followers</span></span>
+    <span><b id="mFg">0</b> <span class="text-gray-500">Following</span></span>
+   </div>
+   <div class="text-left text-sm space-y-2 border brd rounded-2xl p-4">
+    <p><span class="text-gray-500" id="qRg"></span> <span id="mRg"></span></p>
+    <p><span class="text-gray-500" id="qKl"></span> <span id="mKl"></span></p>
+    <p><span class="text-gray-500" id="qBd"></span> <span id="mBd"></span></p>
+    <p><span class="text-gray-500" id="qHt"></span> <span id="mHt"></span></p>
+    <p id="mBi" class="text-gray-300 italic pt-1"></p>
+   </div>
+   <div id="mAct" class="flex gap-2 mt-4">
+    <button id="mFB" onclick="tglFollow()" class="flex-1 bb text-white font-bold rounded-full py-2.5 text-sm"></button>
+    <button id="qMs" onclick="dmModal()" class="flex-1 border brd font-bold rounded-full py-2.5 text-sm hover:bg-neutral-900"></button>
+   </div>
+  </div>
+ </div>
+</div>
+<script>
+"use strict";
+var API=window.location.origin+"/api";
+var me=null,partner=null,mUser=null,pollT=null,ntT=null,uT=null;
+var mB64=null,mType=null,avB64=null,rT={},oC={},oNC={},pCache={},nCache={},ceoExtraCache={},ceoEditId=null;
+var LANG=localStorage.getItem("chalker_lang")||"uz";
+window.onerror=function(m,s,l){alert("JS xato: "+m+" ("+l+")")};
+
+var TR={
+uz:{slogan:"Maktab ijtimoiy tarmog'i",tag:"Fikrlaring bilan maktabni bo'yab tashla!",lg:"Kirish",rg:"Ro'yxatdan o'tish",na:"Akkount yo'qmi?",ha:"Akkount bormi?",un:"Username",pw:"Parol",fn:"To'liq ism",uT:"Band",uF:"Bo'sh",v1:"Chalking",v2:"Yangiliklar",v3:"Profil",v4:"Chat",v5:"Bildirishnoma",v6:"Til",v7:"CEO",out:"Chiqish",wh:"Nima gaplar?!",md:"Rasm/Video",ef:"Postlar yo'q. Birinchi bo'l!",av:"Avatar",rl:"MAQOM",st:"O'quvchi",tc:"O'qituvchi",geo:"Hudud va maktab",ct:"DAVLAT",rgn:"VILOYAT",sc:"MAKTAB",kl:"SINF",c1:"Davlatni tanlang",c2:"Viloyatni tanlang",c4:"Maktabni tanlang",c5:"Sinfni tanlang",bd:"TUG'ILGAN KUN",hd:"Yashirish",ht:"YURAK",hA:"Bo'sh",hC:"Murakkab",hL:"Band",hP:"Sir",sv:"Saqlash",svd:"Saqlandi!",ac:"Akkount xavfsizligi",aU:"Yangi username",aC:"Joriy parol",aN:"Yangi parol",up:"Yangilash",chs:"Chatlar",nc:"+ Yangi",slc:"Suhbatni tanlang",mp:"Xabar yozing...",nch:"Suhbatlar yo'q",pu:"Username kiriting:",np:"Yangi e'lon...",pb:"E'lon qilish",nn:"Yangiliklar yo'q",bd2:"Yangilik huquqini berish/olish",gr:"Huquqni almashtirish",ed:"Tahrirlash",dl:"O'chirish",fl:"Follow",uf:"Unfollow",sm:"Xabar yozish",hdn:"Yashirin",rp:"Javob yozing...",snd:"Yuborish",fc:"Birinchi komment yoz",cn:"bekor",cd:"Rostdan o'chirasizmi?",ep:"Yangi matn:",rpl:"Javob",nnt:"Bildirishnomalar yo'q",l1:"yurakcha bosdi",l2:"komment yozdi",l3:"xabar yubordi",l4:"yangi e'lon",cN:"Ism",cT:"Lavozim",cB:"Bio",addCeo:"Yangi CEO qo'shish"},
+en:{slogan:"School social network",tag:"Chalk up your school with your thoughts!",lg:"Log in",rg:"Sign up",na:"No account?",ha:"Have an account?",un:"Username",pw:"Password",fn:"Full name",uT:"Taken",uF:"Available",v1:"Chalking",v2:"News",v3:"Profile",v4:"Chat",v5:"Notifications",v6:"Language",v7:"CEO",out:"Log out",wh:"What's happening?!",md:"Image/Video",ef:"No posts yet. Be first!",av:"Avatar",rl:"ROLE",st:"Student",tc:"Teacher",geo:"Region & school",ct:"COUNTRY",rgn:"REGION",sc:"SCHOOL",kl:"CLASS",c1:"Select country",c2:"Select region",c4:"Select school",c5:"Select class",bd:"BIRTHDAY",hd:"Hide",ht:"HEART",hA:"Available",hC:"Complicated",hL:"Locked",hP:"Private",sv:"Save",svd:"Saved!",ac:"Account security",aU:"New username",aC:"Current password",aN:"New password",up:"Update",chs:"Chats",nc:"+ New",slc:"Select a chat",mp:"Type a message...",nch:"No chats",pu:"Enter username:",np:"New announcement...",pb:"Publish",nn:"No news",bd2:"Grant/revoke news rights",gr:"Toggle rights",ed:"Edit",dl:"Delete",fl:"Follow",uf:"Unfollow",sm:"Message",hdn:"Hidden",rp:"Write a reply...",snd:"Send",fc:"Be first to comment",cn:"cancel",cd:"Really delete?",ep:"New text:",rpl:"Reply",nnt:"No notifications",l1:"liked your post",l2:"commented",l3:"sent a message",l4:"new announcement",cN:"Name",cT:"Title",cB:"Bio",addCeo:"Add new CEO"},
+ru:{slogan:"Школьная соцсеть",tag:"Раскрась школу своими мыслями!",lg:"Войти",rg:"Регистрация",na:"Нет аккаунта?",ha:"Есть аккаунт?",un:"Имя пользователя",pw:"Пароль",fn:"Полное имя",uT:"Занято",uF:"Свободно",v1:"Chalking",v2:"Новости",v3:"Профиль",v4:"Чат",v5:"Уведомления",v6:"Язык",v7:"CEO",out:"Выйти",wh:"Что нового?!",md:"Фото/Видео",ef:"Постов нет. Будьте первым!",av:"Аватар",rl:"СТАТУС",st:"Ученик",tc:"Учитель",geo:"Регион и школа",ct:"СТРАНА",rgn:"ОБЛАСТЬ",sc:"ШКОЛА",kl:"КЛАСС",c1:"Выберите страну",c2:"Выберите область",c4:"Выберите школу",c5:"Выберите класс",bd:"ДЕНЬ РОЖДЕНИЯ",hd:"Скрыть",ht:"СЕРДЦЕ",hA:"Свободен(а)",hC:"Всё сложно",hL:"Занят(а)",hP:"Секрет",sv:"Сохранить",svd:"Сохранено!",ac:"Безопасность",aU:"Новый username",aC:"Текущий пароль",aN:"Новый пароль",up:"Обновить",chs:"Чаты",nc:"+ Новый",slc:"Выберите чат",mp:"Сообщение...",nch:"Чатов нет",pu:"Введите username:",np:"Новое объявление...",pb:"Опубликовать",nn:"Новостей нет",bd2:"Право на новости",gr:"Переключить право",ed:"Изменить",dl:"Удалить",fl:"Подписаться",uf:"Отписаться",sm:"Написать",hdn:"Скрыто",rp:"Ответ...",snd:"Отправить",cn:"отмена",fc:"Будьте первым",cd:"Точно удалить?",ep:"Новый текст:",rpl:"Ответить",nnt:"Уведомлений нет",l1:"понравился ваш пост",l2:"комментировал",l3:"отправил сообщение",l4:"новое объявление",cN:"Имя",cT:"Должность",cB:"Био",addCeo:"Добавить нового CEO"}};
+function t(k){return (TR[LANG]&&TR[LANG][k])||TR.uz[k]||k}
+
+var HO='<svg class="w-5 h-5 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+var HF='<svg class="w-5 h-5 inline" viewBox="0 0 24 24" fill="#f91880" stroke="#f91880" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+var CK='<svg class="w-4 h-4 inline align-text-top" viewBox="0 0 24 24" fill="#1d9bf0"><path d="M22.25 12c0-1.43-.88-2.67-2.19-3.34.46-1.39.2-2.9-.81-3.91s-2.52-1.27-3.91-.81c-.66-1.31-1.91-2.19-3.34-2.19s-2.67.88-3.33 2.19c-1.4-.46-2.91-.2-3.92.81s-1.26 2.52-.8 3.91c-1.31.67-2.2 1.91-2.2 3.34s.89 2.67 2.2 3.34c-.46 1.39-.21 2.9.8 3.91s2.52 1.26 3.91.81c.67 1.31 1.91 2.19 3.34 2.19s2.68-.88 3.34-2.19c1.39.45 2.9.2 3.91-.81s1.27-2.52.81-3.91c1.31-.67 2.19-1.91 2.19-3.34zm-11.71 4.2L6.8 12.46l1.41-1.42 2.26 2.26 4.8-5.23 1.47 1.36-6.2 6.77z"/></svg>';
+var CR='<svg class="w-4 h-4 inline align-text-top" viewBox="0 0 24 24" fill="#fbbf24"><path d="M2 7l5 4 5-7 5 7 5-4-2 13H4L2 7z"/></svg>';
+var EY='<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+var EF='<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+function logoHTML(){var s="chalker",h='<span class="logo">';for(var i=0;i<s.length;i++)h+='<span style="animation-delay:'+(i*.12)+'s">'+s.charAt(i)+'</span>';return h+'</span>'}
+
+var GEO={
+"O'zbekiston":["Toshkent shahri","Toshkent viloyati","Andijon","Buxoro","Farg'ona","Jizzax","Namangan","Navoiy","Qashqadaryo","Qoraqalpog'iston","Samarqand","Sirdaryo","Surxondaryo","Xorazm"],
+"Qozog'iston":["Almati","Turkiston"],
+"Qirg'iziston":["Bishkek","O'sh"],
+"Tojikiston":["Dushanbe","Sug'd"],
+"Rossiya":["Moskva","Sankt-Peterburg"]};
+function schools(){var l=["Prezident maktabi","Ixtisoslashtirilgan maktab-internati","Rus maktabi","Ijod maktabi","IT maktab"];for(var i=1;i<=50;i++)l.push(i+"-maktab");return l}
+function classesFor(s){var o=[],n,i;s=s||"";
+ if(/Prezident/i.test(s)){var c=["Green","Blue","Red","Yellow"];for(n=1;n<=11;n++)for(i=0;i<4;i++)o.push(n+" ("+c[i]+")")}
+ else if(/internat/i.test(s)){for(n=1;n<=11;n++)for(i=1;i<=4;i++)o.push(n+"-0"+i)}
+ else if(/^Rus/i.test(s)){var y=["\u0410","\u0411","\u0412","\u0413"];for(n=1;n<=11;n++)for(i=0;i<4;i++)o.push(n+"-"+y[i])}
+ else{var a=["A","B","V","G"];for(n=1;n<=11;n++)for(i=0;i<4;i++)o.push(n+"-"+a[i])}
+ return o}
+
+function $(i){return document.getElementById(i)}
+function sh(i){$(i).classList.remove("hide")}
+function hd(i){$(i).classList.add("hide")}
+function esc(s){var d=document.createElement("div");d.textContent=s||"";return d.innerHTML}
+function ava(a){return a||"https://api.dicebear.com/7.x/thumbs/svg?seed=chalker"}
+function bdg(u,c){if(u==="boss")return " "+CK+CR;if(c===1)return " "+CK;return ""}
+function lm(h){return h.replace(/@([a-z0-9_.]+)/gi,function(m,u){return '<span class="mention" onclick="openProfile(\''+u.toLowerCase()+'\')">@'+u+'</span>'})}
+async function api(p,o){var r=await fetch(API+p,o);var d=await r.json();if(!r.ok)throw new Error(d.error||"Server error");return d}
+function pj(o){return{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(o)}}
+function tEye(i,b){var n=$(i),x=$(b);if(n.type==="password"){n.type="text";x.innerHTML=EF}else{n.type="password";x.innerHTML=EY}}
+function chkU(inp,hint,ex){clearTimeout(uT);uT=setTimeout(async function(){
+ var v=$(inp).value.trim().toLowerCase().replace(/^@/,"");var h=$(hint);if(!v){h.textContent="";return}
+ try{var d=await api("/check_username?username="+encodeURIComponent(v)+(ex?"&exclude_id="+ex:""));
+  h.textContent=d.available?"\u2713 "+t("uF"):"\u2717 "+t("uT");
+  h.className="text-xs h-4 mt-1 mb-2 "+(d.available?"text-green-500":"text-red-500")}catch(e){}},400)}
+
+function tAuth(l){if(l){sh("loginForm");hd("registerForm")}else{hd("loginForm");sh("registerForm")}}
+async function doLogin(){try{var f=new FormData();f.append("username",$("lU").value);f.append("password",$("lP").value);
+ var d=await api("/login",{method:"POST",body:f});setU(d.user);boot()}catch(e){alert(e.message)}}
+async function doRegister(){try{var f=new FormData();f.append("username",$("rU").value);f.append("fullname",$("rF").value);f.append("password",$("rP").value);
+ var d=await api("/register",{method:"POST",body:f});setU(d.user);boot()}catch(e){alert(e.message)}}
+function setU(u){me=u;localStorage.setItem("chalker_user",JSON.stringify(u))}
+function logout(){localStorage.removeItem("chalker_user");me=null;clearInterval(pollT);clearInterval(ntT);hd("appView");sh("authView")}
+
+var NI={
+feed:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#1d9bf0" stroke-width="1.8"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>',
+news:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#1d9bf0" stroke-width="1.8"><rect x="3" y="4" width="15" height="16" rx="2"/><path d="M18 8h3v10a2 2 0 0 1-2 2H5"/><path d="M7 8h7M7 12h7M7 16h4"/></svg>',
+profile:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#1d9bf0" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-6 8-6s6.5 2 8 6"/></svg>',
+chat:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#1d9bf0" stroke-width="1.8"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5z"/></svg>',
+notif:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#1d9bf0" stroke-width="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>',
+lang:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#1d9bf0" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>',
+ceo:'<svg class="nvic" viewBox="0 0 24 24" fill="#fbbf24"><path d="M2.5 7.5 7 11l5-7 5 7 4.5-3.5L19.5 19h-15L2.5 7.5z"/></svg>'};
+function buildNav(){
+ var it=[["feed",t("v1")],["news",t("v2")],["profile",t("v3")],["chat",t("v4")],["notif",t("v5")],["lang",t("v6")],["ceo",t("v7")]];
+ var h="";
+ for(var i=0;i<it.length;i++){
+  var key=it[i][0],label=it[i][1];
+  var dot=key==="notif"?'<span id="nDot" class="dot hide absolute top-0.5 right-2 md:static md:ml-1.5"></span>':"";
+  h+='<div id="navitem-'+key+'" onclick="showView(\''+key+'\')" class="nv relative flex items-center justify-center md:justify-start gap-0 md:gap-3 px-0 md:px-4 py-3 rounded-2xl cursor-pointer font-bold text-lg" title="'+label+'">'+NI[key]+'<span class="hidden md:inline">'+label+'</span>'+dot+'</div>';
+ }
+ $("navBox").innerHTML=h}
+function setActiveNav(n){
+ ["feed","news","profile","chat","notif","lang","ceo"].forEach(function(v){
+  var el=$("navitem-"+v);if(!el)return;
+  if(v===n)el.classList.add("nvactive");else el.classList.remove("nvactive")});
+}
+function showView(n){
+ ["feed","news","profile","chat","notif","lang","ceo"].forEach(function(v){if(v===n)sh("view-"+v);else hd("view-"+v)});
+ setActiveNav(n);
+ if(n==="feed")loadFeed();if(n==="news")loadNews();if(n==="profile")fillProfile();
+ if(n==="chat")loadChatUsers();if(n==="notif")loadNotifs(true);if(n==="ceo")loadCeo()}
+/* FEED */
+async function loadFeed(){try{
+ var ps=await api("/posts?user_id="+me.id);pCache={};
+ if(!ps.length){$("feedList").innerHTML='<p class="text-center text-gray-600 p-10">'+t("ef")+'</p>';return}
+ var h="";ps.forEach(function(p){pCache[p.id]=p;h+=rPost(p)});$("feedList").innerHTML=h;
+ ps.forEach(function(p){if(oC[p.id]){sh("cm-"+p.id);loadCmts(p.id)}})
+}catch(e){alert(e.message)}}
+function lkH(p){return (p.my_status===1?HF:HO)+' '+p.likes_count}
+function rPost(p){
+ var m="";
+ if(p.media_base64&&p.media_type==="video")m='<video src="'+p.media_base64+'" controls preload="none" class="mt-2 rounded-2xl border brd max-h-96 w-full"></video>';
+ else if(p.media_base64)m='<img src="'+p.media_base64+'" loading="lazy" class="mt-2 rounded-2xl border brd max-h-96 object-contain">';
+ var own=p.user_id===me.id?' <span class="text-xs text-gray-500"><span class="cursor-pointer hover:text-sky-500" onclick="edPost('+p.id+')">'+t("ed")+'</span> · <span class="cursor-pointer hover:text-red-400" onclick="dlPost('+p.id+')">'+t("dl")+'</span></span>':"";
+ return '<div class="pc border-b brd p-4 anim"><div class="flex gap-3">'+
+ '<img src="'+ava(p.avatar_base64)+'" onclick="openProfile(\''+p.username+'\')" class="w-11 h-11 rounded-full object-cover cursor-pointer bg-neutral-800">'+
+ '<div class="flex-1 min-w-0"><div class="flex items-center gap-2 flex-wrap">'+
+ '<span class="font-bold cursor-pointer hover:underline" onclick="openProfile(\''+p.username+'\')">'+esc(p.fullname)+bdg(p.username,p.can_post_news)+'</span>'+
+ '<span class="text-gray-500 text-sm">@'+p.username+'</span><span class="text-gray-600 text-xs">'+(p.timestamp||"").slice(0,16).replace("T"," ")+'</span>'+own+'</div>'+
+ '<p id="pt-'+p.id+'" class="mt-1 whitespace-pre-wrap break-words">'+lm(esc(p.content))+'</p>'+m+
+ '<div class="flex gap-8 mt-3 text-sm items-center">'+
+ '<button id="lk-'+p.id+'" onclick="react('+p.id+')" class="'+(p.my_status===1?'text-pink-500':'text-gray-500')+' hover:text-pink-500">'+lkH(p)+'</button>'+
+ '<button onclick="tglC('+p.id+')" class="text-gray-500 hover:text-sky-500">\u{1F4AC} '+p.comments_count+'</button></div>'+
+ '<div id="cm-'+p.id+'" class="hide mt-3 border-t brd pt-3"><div id="cl-'+p.id+'" class="space-y-3 mb-3"></div>'+
+ '<div id="rh-'+p.id+'" class="hide text-xs text-sky-500 mb-1"></div><div class="flex gap-2">'+
+ '<input id="ci-'+p.id+'" placeholder="'+t("rp")+'" onkeydown="if(event.key===\'Enter\')sendCmt('+p.id+')" class="flex-1 bg-neutral-900 border brd rounded-full px-4 py-2 text-sm">'+
+ '<button onclick="sendCmt('+p.id+')" class="bb text-white text-sm font-bold rounded-full px-4">'+t("snd")+'</button></div></div></div></div></div>'}
+async function react(id){try{
+ var d=await api("/posts/like",pj({user_id:me.id,post_id:id,is_like:1}));var p=pCache[id];
+ if(d.liked){p.my_status=1;p.likes_count++}else{p.my_status=null;p.likes_count--}
+ var b=$("lk-"+id);b.innerHTML=lkH(p);b.className=(p.my_status===1?'text-pink-500':'text-gray-500')+' hover:text-pink-500'
+}catch(e){alert(e.message)}}
+async function edPost(id){var n=prompt(t("ep"),pCache[id].content);if(n===null)return;
+ try{await api("/posts/update",pj({user_id:me.id,post_id:id,content:n}));pCache[id].content=n;$("pt-"+id).innerHTML=lm(esc(n))}catch(e){alert(e.message)}}
+async function dlPost(id){if(!confirm(t("cd")))return;
+ try{await api("/posts/delete",pj({user_id:me.id,post_id:id}));loadFeed()}catch(e){alert(e.message)}}
+function cmpImg(f,cb){var r=new FileReader();r.onload=function(e){var im=new Image();
+ im.onload=function(){var mx=1280,w=im.width,h=im.height;
+  if(w>mx||h>mx){if(w>h){h=Math.round(h*mx/w);w=mx}else{w=Math.round(w*mx/h);h=mx}}
+  var c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(im,0,0,w,h);cb(c.toDataURL("image/jpeg",.8))};
+ im.src=e.target.result};r.readAsDataURL(f)}
+function pickMedia(inp){var f=inp.files[0];if(!f)return;
+ if(f.type.indexOf("video")===0){
+  if(f.size>8*1024*1024){alert("Video max 8MB!");inp.value="";return}
+  var r=new FileReader();r.onload=function(e){mB64=e.target.result;mType="video";sh("mBox");$("mVid").src=mB64;sh("mVid");hd("mImg")};r.readAsDataURL(f)
+ }else cmpImg(f,function(d){mB64=d;mType="image";sh("mBox");$("mImg").src=d;sh("mImg");hd("mVid")})}
+function clrMedia(){mB64=null;mType=null;$("mInp").value="";hd("mBox");hd("mImg");hd("mVid")}
+async function createPost(){var c=$("pTxt").value.trim();if(!c&&!mB64)return;
+ try{await api("/posts/create",pj({user_id:me.id,content:c,media_base64:mB64,media_type:mType}));
+  $("pTxt").value="";clrMedia();loadFeed()}catch(e){alert(e.message)}}
+
+/* COMMENTS */
+function tglC(id){var b=$("cm-"+id);if(b.classList.contains("hide")){b.classList.remove("hide");oC[id]=true;loadCmts(id)}else{b.classList.add("hide");oC[id]=false}}
+async function loadCmts(id){try{var l=await api("/comments?post_id="+id);
+ function one(c,r){var canDel=(c.username===me.username||me.username==="boss");
+  var delBtn=canDel?' · <span class="cursor-pointer text-gray-500 hover:text-red-400 font-semibold" onclick="delCmt('+id+','+c.id+')">'+t("dl")+'</span>':"";
+  return '<div class="'+(r?'ml-8 border-l-2 border-neutral-800 pl-3':'')+'"><div class="flex gap-2">'+
+  '<img src="'+ava(c.avatar_base64)+'" class="w-7 h-7 rounded-full object-cover bg-neutral-800 cursor-pointer" onclick="openProfile(\''+c.username+'\')">'+
+  '<div class="flex-1 min-w-0"><span class="font-bold text-sm cursor-pointer hover:underline" onclick="openProfile(\''+c.username+'\')">'+esc(c.fullname)+bdg(c.username,c.can_post_news)+'</span>'+
+  ' <span class="text-gray-500 text-xs">@'+c.username+'</span><p class="text-sm break-words">'+lm(esc(c.content))+'</p>'+
+  '<button onclick="setRep('+id+','+c.id+',\''+c.username+'\')" class="text-xs text-gray-500 hover:text-sky-500 font-semibold">'+t("rpl")+'</button>'+delBtn+'</div></div></div>'}
+ var h="";l.forEach(function(c){if(!c.parent_id){h+=one(c,false);l.forEach(function(r){if(r.parent_id===c.id)h+=one(r,true)})}});
+ $("cl-"+id).innerHTML=h||'<p class="text-gray-600 text-xs">'+t("fc")+'</p>'}catch(e){alert(e.message)}}
+async function delCmt(postId,commentId){if(!confirm(t("cd")))return;
+ try{await api("/comments/delete",pj({user_id:me.id,comment_id:commentId}));
+  if(pCache[postId]&&pCache[postId].comments_count>0){pCache[postId].comments_count--;
+   var countBtn=document.querySelector('[onclick="tglC('+postId+')"]');
+   if(countBtn)countBtn.innerHTML="\u{1F4AC} "+pCache[postId].comments_count}
+  loadCmts(postId)}catch(e){alert(e.message)}}
+function setRep(p,c,u){rT[p]={id:c};var h=$("rh-"+p);h.innerHTML="@"+u+" <span class='cursor-pointer text-red-400' onclick='cnlRep("+p+")'>"+t("cn")+"</span>";h.classList.remove("hide");$("ci-"+p).focus()}
+function cnlRep(p){delete rT[p];$("rh-"+p).classList.add("hide")}
+async function sendCmt(p){var i=$("ci-"+p),c=i.value.trim();if(!c)return;
+ try{await api("/comments/create",pj({user_id:me.id,post_id:p,content:c,parent_id:rT[p]?rT[p].id:null}));
+  i.value="";cnlRep(p);oC[p]=true;loadCmts(p)}catch(e){alert(e.message)}}
+
+/* PROFILE */
+function fillSel(s,items,cur,ph){var h='<option value="">'+ph+'</option>';items.forEach(function(i){h+='<option value="'+i+'"'+(i===cur?' selected':'')+'>'+i+'</option>'});s.innerHTML=h}
+function onCt(){var c=$("pCt").value;fillSel($("pRg"),c&&GEO[c]?GEO[c]:[],"",t("c2"));fillSel($("pSc"),[],"",t("c4"));fillSel($("pKl"),[],"",t("c5"))}
+function onRg(){fillSel($("pSc"),$("pRg").value?schools():[],"",t("c4"));fillSel($("pKl"),[],"",t("c5"))}
+function onSc(){fillSel($("pKl"),classesFor($("pSc").value),"",t("c5"))}
+function fillProfile(){
+ $("pFn").value=me.fullname||"";$("pBio").value=me.bio||"";$("pBd").value=me.birth_date||"";
+ $("pHB").checked=me.hide_birth_date===1;$("pHt").value=me.heart_status||"Available";
+ $("pRole").value=me.role||"student";$("pAv").src=ava(me.avatar_base64);avB64=null;
+ fillSel($("pCt"),Object.keys(GEO),me.country||"",t("c1"));
+ fillSel($("pRg"),me.country&&GEO[me.country]?GEO[me.country]:[],me.region||"",t("c2"));
+ fillSel($("pSc"),me.region?schools():[],me.school_name||"",t("c4"));
+ fillSel($("pKl"),classesFor(me.school_name),me.school_class||"",t("c5"));
+ $("aU").value="";$("aC").value="";$("aN").value=""}
+function pickAvatar(inp){var f=inp.files[0];if(!f)return;cmpImg(f,function(d){avB64=d;$("pAv").src=d})}
+async function saveProfile(){try{
+ var f=new FormData();f.append("user_id",me.id);f.append("fullname",$("pFn").value);
+ f.append("school_class",$("pKl").value);f.append("school_name",$("pSc").value);
+ f.append("country",$("pCt").value);f.append("region",$("pRg").value);f.append("district","");
+ f.append("role",$("pRole").value);f.append("bio",$("pBio").value);f.append("birth_date",$("pBd").value);
+ f.append("hide_birth_date",$("pHB").checked?1:0);f.append("heart_status",$("pHt").value);
+ f.append("avatar_base64",avB64||"");
+ var d=await api("/profile/update",{method:"POST",body:f});setU(d.user);renderSide();alert(t("svd"))}catch(e){alert(e.message)}}
+async function saveAccount(){try{
+ var f=new FormData();f.append("user_id",me.id);f.append("current_password",$("aC").value);
+ f.append("new_username",$("aU").value);f.append("new_password",$("aN").value);
+ var d=await api("/account/update",{method:"POST",body:f});setU(d.user);renderSide();fillProfile();alert(t("svd"))}catch(e){alert(e.message)}}
+
+/* CHAT */
+async function loadChatUsers(){try{
+ var us=await api("/chat/active_users?user_id="+me.id);
+ if(!us.length){$("chatUsers").innerHTML='<p class="text-center text-gray-600 text-xs p-4">'+t("nch")+'</p>';return}
+ var h="";us.forEach(function(u){
+  h+='<div onclick="openChat(\''+u.username+'\')" class="flex items-center gap-2 p-3 hover:bg-neutral-900 cursor-pointer '+(partner===u.username?'bg-sky-500/10':'')+'">'+
+  '<img src="'+ava(u.avatar_base64)+'" class="w-10 h-10 rounded-full object-cover bg-neutral-800">'+
+  '<div class="min-w-0 flex-1"><p class="text-xs font-bold truncate">'+esc(u.fullname)+bdg(u.username,u.can_post_news)+'</p>'+
+  '<p class="text-xs text-gray-500 truncate">'+esc(u.last_message||"@"+u.username)+'</p></div></div>'});
+ $("chatUsers").innerHTML=h}catch(e){alert(e.message)}}
+function newChat(){var u=prompt(t("pu"));if(u)openChat(u.trim().toLowerCase().replace(/^@/,""))}
+async function openChat(u){partner=u;sh("chBar");await loadHist(true);loadChatUsers()}
+async function loadHist(fs){if(!partner)return;try{
+ var d=await api("/chat/history?user_id="+me.id+"&partner_username="+encodeURIComponent(partner));
+ $("chHead").innerHTML='<div class="flex items-center gap-2 cursor-pointer" onclick="openProfile(\''+d.partner.username+'\')">'+
+ '<img src="'+ava(d.partner.avatar_base64)+'" class="w-8 h-8 rounded-full object-cover bg-neutral-800">'+
+ '<div><p class="font-bold text-white text-sm">'+esc(d.partner.fullname)+bdg(d.partner.username,d.partner.can_post_news)+'</p>'+
+ '<p class="text-xs text-sky-500">@'+d.partner.username+'</p></div></div>';
+ var b=$("chMsgs"),ab=b.scrollHeight-b.scrollTop-b.clientHeight<60,h="";
+ d.messages.forEach(function(m){var mn=m.sender_id===me.id;
+  h+='<div class="flex '+(mn?'justify-end':'justify-start')+'"><div class="max-w-[72%] px-4 py-2 text-sm break-words rounded-2xl '+(mn?'bb text-white rounded-br-md':'bg-neutral-800 rounded-bl-md')+'">'+
+  esc(m.message)+'<span class="text-[10px] opacity-60 ml-2">'+(m.timestamp||"").slice(11,16)+'</span></div></div>'});
+ b.innerHTML=h;if(fs||ab)b.scrollTop=b.scrollHeight}catch(e){alert(e.message);partner=null}}
+async function sendMsg(){var i=$("chInp"),m=i.value.trim();if(!m||!partner)return;
+ try{await api("/chat/send",pj({sender_id:me.id,receiver_username:partner,message:m}));i.value="";loadHist(true);loadChatUsers()}catch(e){alert(e.message)}}
+/* NEWS */
+function nlkH(n){return (n.my_like?HF:HO)+' '+n.likes_count}
+async function loadNews(){try{
+ var ns=await api("/news?user_id="+me.id);nCache={};
+ if(!ns.length){$("newsList").innerHTML='<p class="text-center text-gray-600 p-10">'+t("nn")+'</p>';return}
+ var h="";
+ ns.forEach(function(n){nCache[n.id]=n;
+  var mine=(n.author===me.username)||(me.username==="boss");
+  var own=mine?' <span class="text-xs text-gray-500"><span class="cursor-pointer hover:text-sky-500" onclick="edNews('+n.id+')">'+t("ed")+'</span> · <span class="cursor-pointer hover:text-red-400" onclick="dlNews('+n.id+')">'+t("dl")+'</span></span>':"";
+  h+='<div class="pc border-b brd p-4 anim"><div class="flex items-center gap-2 flex-wrap">'+
+  '<span class="font-bold">\u{1F4E2} '+t("v2")+'</span>'+
+  (n.author?'<span class="mention" onclick="openProfile(\''+n.author+'\')">@'+n.author+'</span>':'')+
+  '<span class="text-gray-600 text-xs">'+(n.timestamp||"").slice(0,16).replace("T"," ")+'</span>'+own+'</div>'+
+  '<p id="nt-'+n.id+'" class="mt-1 whitespace-pre-wrap break-words">'+lm(esc(n.title))+'</p>'+
+  '<div class="flex gap-8 mt-3 text-sm items-center">'+
+  '<button id="nlk-'+n.id+'" onclick="nReact('+n.id+')" class="'+(n.my_like?'text-pink-500':'text-gray-500')+' hover:text-pink-500">'+nlkH(n)+'</button>'+
+  '<button onclick="tglNC('+n.id+')" class="text-gray-500 hover:text-sky-500">\u{1F4AC} '+n.comments_count+'</button></div>'+
+  '<div id="ncm-'+n.id+'" class="hide mt-3 border-t brd pt-3"><div id="ncl-'+n.id+'" class="space-y-3 mb-3"></div><div class="flex gap-2">'+
+  '<input id="nci-'+n.id+'" placeholder="'+t("rp")+'" onkeydown="if(event.key===\'Enter\')sendNCmt('+n.id+')" class="flex-1 bg-neutral-900 border brd rounded-full px-4 py-2 text-sm">'+
+  '<button onclick="sendNCmt('+n.id+')" class="bb text-white text-sm font-bold rounded-full px-4">'+t("snd")+'</button></div></div></div>'});
+ $("newsList").innerHTML=h;
+ ns.forEach(function(n){if(oNC[n.id]){sh("ncm-"+n.id);loadNCmts(n.id)}})
+}catch(e){alert(e.message)}}
+async function nReact(id){try{
+ var d=await api("/news/like",pj({user_id:me.id,news_id:id}));var n=nCache[id];
+ if(d.liked){n.my_like=1;n.likes_count++}else{n.my_like=null;n.likes_count--}
+ var b=$("nlk-"+id);b.innerHTML=nlkH(n);b.className=(n.my_like?'text-pink-500':'text-gray-500')+' hover:text-pink-500'}catch(e){alert(e.message)}}
+function tglNC(id){var b=$("ncm-"+id);if(b.classList.contains("hide")){b.classList.remove("hide");oNC[id]=true;loadNCmts(id)}else{b.classList.add("hide");oNC[id]=false}}
+async function loadNCmts(id){try{var l=await api("/news/comments?news_id="+id);var h="";
+ l.forEach(function(c){var canDel=(c.username===me.username||me.username==="boss");
+  var delBtn=canDel?' <span class="cursor-pointer text-gray-500 hover:text-red-400 font-semibold" onclick="delNCmt('+id+','+c.id+')">'+t("dl")+'</span>':"";
+  h+='<div class="flex gap-2"><img src="'+ava(c.avatar_base64)+'" class="w-7 h-7 rounded-full object-cover bg-neutral-800 cursor-pointer" onclick="openProfile(\''+c.username+'\')">'+
+  '<div class="flex-1 min-w-0"><span class="font-bold text-sm cursor-pointer hover:underline" onclick="openProfile(\''+c.username+'\')">'+esc(c.fullname)+bdg(c.username,c.can_post_news)+'</span>'+
+  ' <span class="text-gray-500 text-xs">@'+c.username+'</span><p class="text-sm break-words">'+lm(esc(c.content))+delBtn+'</p></div></div>'});
+ $("ncl-"+id).innerHTML=h||'<p class="text-gray-600 text-xs">'+t("fc")+'</p>'}catch(e){alert(e.message)}}
+async function delNCmt(newsId,commentId){if(!confirm(t("cd")))return;
+ try{await api("/news/comments/delete",pj({user_id:me.id,comment_id:commentId}));
+  if(nCache[newsId]&&nCache[newsId].comments_count>0){nCache[newsId].comments_count--;
+   var countBtn=document.querySelector('[onclick="tglNC('+newsId+')"]');
+   if(countBtn)countBtn.innerHTML="\u{1F4AC} "+nCache[newsId].comments_count}
+  loadNCmts(newsId)}catch(e){alert(e.message)}}
+async function sendNCmt(id){var i=$("nci-"+id),c=i.value.trim();if(!c)return;
+ try{await api("/news/comments/create",pj({user_id:me.id,news_id:id,content:c}));i.value="";oNC[id]=true;loadNCmts(id)}catch(e){alert(e.message)}}
+async function pubNews(){var v=$("nInp").value.trim();if(!v)return;
+ try{await api("/news/create",pj({user_id:me.id,title:v}));$("nInp").value="";loadNews()}catch(e){alert(e.message)}}
+async function edNews(id){var n=prompt(t("ep"),nCache[id].title);if(n===null)return;
+ try{await api("/news/update",pj({user_id:me.id,news_id:id,title:n}));loadNews()}catch(e){alert(e.message)}}
+async function dlNews(id){if(!confirm(t("cd")))return;
+ try{await api("/news/delete",pj({user_id:me.id,news_id:id}));loadNews()}catch(e){alert(e.message)}}
+async function grantNews(){var u=$("gU").value.trim();if(!u)return;
+ try{var d=await api("/admin/news_rights",pj({boss_id:me.id,target_username:u}));
+  alert("@"+u.replace(/^@/,"")+(d.granted?" \u2713":" \u2717"));$("gU").value=""}catch(e){alert(e.message)}}
+
+/* NOTIFICATIONS */
+async function loadNotifs(mark){try{
+ var ns=await api("/notifications?user_id="+me.id);
+ if(mark&&ns.length)localStorage.setItem("chalker_seen",ns[0].ts||"");
+ updDot(ns);
+ if(!ns.length){$("ntList").innerHTML='<p class="text-center text-gray-600 p-10">'+t("nnt")+'</p>';return}
+ var mp={like:t("l1"),comment:t("l2"),message:t("l3"),news:t("l4")};
+ var ic={like:"\u2764\uFE0F",comment:"\u{1F4AC}",message:"\u2709\uFE0F",news:"\u{1F4E2}"};
+ var h="";ns.forEach(function(n){
+  h+='<div class="border brd rounded-2xl p-3 anim"><p class="text-sm">'+ic[n.type]+' <span class="mention" onclick="openProfile(\''+n.username+'\')">@'+n.username+'</span> '+mp[n.type]+'</p>'+
+  '<p class="text-xs text-gray-500 mt-1 truncate">'+esc(n.snippet||"")+'</p>'+
+  '<p class="text-[10px] text-gray-600">'+(n.ts||"").slice(0,16).replace("T"," ")+'</p></div>'});
+ $("ntList").innerHTML=h}catch(e){}}
+function updDot(ns){
+ var seen=localStorage.getItem("chalker_seen")||"";
+ var el=$("nDot");if(!el)return;
+ if(ns.length&&(ns[0].ts||"")>seen)el.classList.remove("hide");else el.classList.add("hide")}
+
+/* CEO */
+async function loadCeo(){try{var d=await api("/ceo");
+ $("cNm").textContent=d.name;$("cTt").textContent=d.title;$("cBi").textContent=d.bio;
+ var ini="";d.name.split(" ").forEach(function(w){if(w)ini+=w[0]});$("ceoIn").textContent=ini.slice(0,2).toUpperCase();
+ var tg=d.telegram.replace(/^@/,""),ig=d.instagram.replace(/^@/,""),ch=d.chalker.replace(/^@/,"");
+ $("cLk").innerHTML='<a href="https://t.me/'+tg+'" target="_blank" class="border brd rounded-full px-5 py-2 font-bold hover:bg-neutral-900 w-56">Telegram · @'+tg+'</a>'+
+ '<a href="https://instagram.com/'+ig+'" target="_blank" class="border brd rounded-full px-5 py-2 font-bold hover:bg-neutral-900 w-56">Instagram · @'+ig+'</a>'+
+ '<span onclick="openProfile(\''+ch+'\')" class="border brd rounded-full px-5 py-2 font-bold hover:bg-neutral-900 w-56 cursor-pointer text-sky-500">Chalker · @'+ch+'</span>';
+ if(me.username==="boss"){sh("ceoEB");$("fNm").value=d.name;$("fTt").value=d.title;$("fBi").value=d.bio;
+  $("fTg").value=d.telegram;$("fIg").value=d.instagram;$("fCh").value=d.chalker;sh("ceoAddWrap")}
+ else{hd("ceoEB");$("ceoForm").classList.add("hide");$("ceoShow").classList.remove("hide");hd("ceoAddWrap");hd("ceoAddForm")}
+ loadExtraCeos()
+}catch(e){alert(e.message)}}
+async function loadExtraCeos(){try{
+ var list=await api("/ceo/list");ceoExtraCache={};
+ if(!list||!list.length){$("ceoExtra").innerHTML="";return}
+ var isBoss=(me.username==="boss"),h="";
+ list.forEach(function(d){ceoExtraCache[d.id]=d;
+  var ini="";(d.name||"").split(" ").forEach(function(w){if(w)ini+=w[0]});ini=ini.slice(0,2).toUpperCase();
+  var tg=(d.telegram||"").replace(/^@/,""),ig=(d.instagram||"").replace(/^@/,""),ch=(d.chalker||"").replace(/^@/,"");
+  var ownRow=isBoss?'<div class="flex justify-end gap-3 text-xs text-gray-500 mb-1"><span class="cursor-pointer hover:text-sky-500 font-semibold" onclick="editCeoExtra('+d.id+')">'+t("ed")+'</span><span class="cursor-pointer hover:text-red-400 font-semibold" onclick="delCeoExtra('+d.id+')">'+t("dl")+'</span></div>':"";
+  h+='<div class="border brd rounded-2xl p-5 text-center anim">'+ownRow+
+  '<div class="w-16 h-16 mx-auto rounded-full bb flex items-center justify-center text-xl font-extrabold text-white mb-3">'+ini+'</div>'+
+  '<h4 class="text-lg font-extrabold">'+esc(d.name)+'</h4><p class="text-sky-500 font-semibold text-sm mt-0.5">'+esc(d.title)+'</p>'+
+  (d.bio?'<p class="text-gray-400 text-xs mt-3">'+esc(d.bio)+'</p>':'')+
+  '<div class="flex flex-col items-center gap-2 mt-4 text-xs">'+
+  (tg?'<a href="https://t.me/'+tg+'" target="_blank" class="border brd rounded-full px-4 py-1.5 font-bold hover:bg-neutral-900 w-48">Telegram · @'+tg+'</a>':'')+
+  (ig?'<a href="https://instagram.com/'+ig+'" target="_blank" class="border brd rounded-full px-4 py-1.5 font-bold hover:bg-neutral-900 w-48">Instagram · @'+ig+'</a>':'')+
+  (ch?'<span onclick="openProfile(\''+ch+'\')" class="border brd rounded-full px-4 py-1.5 font-bold hover:bg-neutral-900 w-48 cursor-pointer text-sky-500">Chalker · @'+ch+'</span>':'')+
+  '</div></div>'});
+ $("ceoExtra").innerHTML=h
+}catch(e){$("ceoExtra").innerHTML=""}}
+function clearCeoAddFields(){$("acNm").value="";$("acTt").value="";$("acBi").value="";$("acTg").value="";$("acIg").value="";$("acCh").value=""}
+function toggleCeoAddForm(){ceoEditId=null;clearCeoAddFields();$("tAddCeo").textContent=t("addCeo");
+ $("ceoAddForm").classList.remove("hide");$("ceoAddForm").scrollIntoView({behavior:"smooth",block:"nearest"})}
+function editCeoExtra(id){var d=ceoExtraCache[id];if(!d)return;ceoEditId=id;
+ $("acNm").value=d.name||"";$("acTt").value=d.title||"";$("acBi").value=d.bio||"";
+ $("acTg").value=d.telegram||"";$("acIg").value=d.instagram||"";$("acCh").value=d.chalker||"";
+ $("tAddCeo").textContent=t("ed");$("ceoAddForm").classList.remove("hide");
+ $("ceoAddForm").scrollIntoView({behavior:"smooth",block:"nearest"})}
+async function delCeoExtra(id){if(!confirm(t("cd")))return;
+ try{await api("/ceo/extra/delete",pj({user_id:me.id,ceo_id:id}));loadExtraCeos()}catch(e){alert(e.message)}}
+async function addCeo(){var nm=$("acNm").value.trim();if(!nm)return;
+ try{
+  if(ceoEditId){
+   await api("/ceo/extra/update",pj({user_id:me.id,ceo_id:ceoEditId,name:nm,title:$("acTt").value,bio:$("acBi").value,
+   telegram:$("acTg").value,instagram:$("acIg").value,chalker:$("acCh").value}));
+  }else{
+   await api("/ceo/create",pj({user_id:me.id,name:nm,title:$("acTt").value,bio:$("acBi").value,
+   telegram:$("acTg").value,instagram:$("acIg").value,chalker:$("acCh").value}));
+  }
+  ceoEditId=null;clearCeoAddFields();$("ceoAddForm").classList.add("hide");loadExtraCeos();alert(t("svd"))
+ }catch(e){alert(e.message)}}
+function tCeoEdit(){$("ceoShow").classList.toggle("hide");$("ceoForm").classList.toggle("hide")}
+async function saveCeo(){try{
+ await api("/ceo/update",pj({user_id:me.id,name:$("fNm").value,title:$("fTt").value,bio:$("fBi").value,
+ telegram:$("fTg").value,instagram:$("fIg").value,chalker:$("fCh").value}));tCeoEdit();loadCeo();alert(t("svd"))}catch(e){alert(e.message)}}
+
+/* MODAL */
+async function openProfile(u){try{
+ var d=await api("/users/"+encodeURIComponent(u)+"?viewer_id="+me.id);mUser=d;
+ $("mAv").src=ava(d.avatar_base64);$("mFn").innerHTML=esc(d.fullname||d.username)+bdg(d.username,d.can_post_news);
+ $("mUn").textContent="@"+d.username;$("mRl").textContent=d.role==="teacher"?t("tc"):t("st");
+ $("mFw").textContent=d.followers;$("mFg").textContent=d.following;
+ var rg=[];if(d.country)rg.push(d.country);if(d.region)rg.push(d.region);if(d.school_name)rg.push(d.school_name);
+ $("mRg").textContent=rg.join(", ")||"—";$("mKl").textContent=d.school_class||"—";
+ $("mBd").textContent=d.birth_date||t("hdn");$("mHt").textContent=t("h"+(d.heart_status||"Available").charAt(0));
+ $("mBi").textContent=d.bio?'"'+d.bio+'"':"";
+ $("mFB").textContent=d.is_following?t("uf"):t("fl");
+ if(d.id===me.id)hd("mAct");else sh("mAct");sh("pModal")}catch(e){alert(e.message)}}
+function closeModal(){hd("pModal")}
+async function tglFollow(){try{await api("/users/follow",pj({follower_id:me.id,following_username:mUser.username}));openProfile(mUser.username)}catch(e){alert(e.message)}}
+function dmModal(){closeModal();showView("chat");openChat(mUser.username)}
+
+/* BOOT */
+function applyLang(){
+ $("authLogo").innerHTML=logoHTML();$("sideLogo").innerHTML=logoHTML();$("heroLogo").innerHTML=logoHTML();
+ $("heroTag").textContent=t("tag");$("sideTag").textContent=t("slogan");$("tSlogan").textContent=t("slogan");
+ $("lU").placeholder=t("un");$("lP").placeholder=t("pw");$("rU").placeholder=t("un");$("rF").placeholder=t("fn");$("rP").placeholder=t("pw");
+ $("tLB").textContent=t("lg");$("tRB").textContent=t("rg");$("tNA").textContent=t("na");$("tGR").textContent=t("rg");
+ $("tHA").textContent=t("ha");$("tGL").textContent=t("lg");$("tOut").textContent=t("out");
+ $("pTxt").placeholder=t("wh");$("tMd").textContent=t("md");$("tAvt").textContent=t("av");
+ $("tFN").textContent=t("fn").toUpperCase();$("tRl").textContent=t("rl");
+ var ro=$("pRole").options;ro[0].text=t("st");ro[1].text=t("tc");
+ $("tGeo").textContent=t("geo");$("tCt").textContent=t("ct");$("tRg").textContent=t("rgn");
+ $("tSc").textContent=t("sc");$("tKl").textContent=t("kl");
+ $("tBd").textContent=t("bd");$("tHd").textContent=t("hd");$("tHt").textContent=t("ht");
+ var ho=$("pHt").options;ho[0].text=t("hA");ho[1].text=t("hC");ho[2].text=t("hL");ho[3].text=t("hP");
+ $("tSv").textContent=t("sv");$("tAc").textContent=t("ac");
+ $("aU").placeholder=t("aU");$("aC").placeholder=t("aC");$("aN").placeholder=t("aN");$("tAB").textContent=t("up");
+ $("tCh").textContent=t("chs");$("tNC").textContent=t("nc");$("chHead").textContent=t("slc");$("chInp").placeholder=t("mp");
+ $("nInp").placeholder=t("np");$("tPub").textContent=t("pb");$("tBD").textContent=t("bd2");$("tGr").textContent=t("gr");
+ $("ceoEB").textContent=t("ed");$("tCS").textContent=t("sv");
+ $("fNm").placeholder=t("cN");$("fTt").placeholder=t("cT");$("fBi").placeholder=t("cB");
+ $("fTg").placeholder="Telegram @";$("fIg").placeholder="Instagram @";$("fCh").placeholder="Chalker @";
+ $("tAddCeo").textContent=t("addCeo");$("tACS").textContent=t("sv");
+ $("acNm").placeholder=t("cN");$("acTt").placeholder=t("cT");$("acBi").placeholder=t("cB");
+ $("acTg").placeholder="Telegram @";$("acIg").placeholder="Instagram @";$("acCh").placeholder="Chalker @";
+ $("qRg").textContent=t("geo")+":";$("qKl").textContent=t("kl")+":";
+ $("qBd").textContent=t("bd")+":";$("qHt").textContent=t("ht")+":";$("qMs").textContent=t("sm");
+ $("eL").innerHTML=EY;$("eR").innerHTML=EY;$("e1").innerHTML=EY;$("e2").innerHTML=EY}
+function setLang(l){LANG=l;localStorage.setItem("chalker_lang",l);applyLang();if(me){buildNav();showView("feed")}}
+function renderSide(){
+ $("sAv").src=ava(me.avatar_base64);$("cAv").src=ava(me.avatar_base64);
+ $("sNm").innerHTML=esc(me.fullname||me.username)+bdg(me.username,me.can_post_news);
+ $("sUn").textContent="@"+me.username;
+ if(me.username==="boss"||me.can_post_news===1)sh("newsComposer");else hd("newsComposer");
+ if(me.username==="boss")sh("bossPanel");else hd("bossPanel")}
+function boot(){
+ hd("authView");sh("appView");buildNav();renderSide();showView("feed");
+ clearInterval(pollT);pollT=setInterval(function(){if(!$("view-chat").classList.contains("hide")&&partner)loadHist(false)},3000);
+ clearInterval(ntT);ntT=setInterval(function(){loadNotifs(false)},20000);loadNotifs(false)}
+document.addEventListener("DOMContentLoaded",function(){
+ applyLang();
+ try{me=JSON.parse(localStorage.getItem("chalker_user"))}catch(e){me=null}
+ if(me&&me.id)boot();else sh("authView")});
+</script>
+</body>
+</html>
