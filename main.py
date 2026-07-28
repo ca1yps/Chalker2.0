@@ -1,63 +1,111 @@
-import sqlite3, os
+import os
 from typing import Optional
+import psycopg2
+import psycopg2.extras
 from fastapi import FastAPI, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
-DB = "chalker_v4.db"
-INDEX = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates", "index.html")
+# ---------------------------------------------------------------------------
+# Database connection (PostgreSQL / Supabase)
+# ---------------------------------------------------------------------------
+# Prefer an environment variable (set this in Render's dashboard -> Environment)
+# so the real password never has to live inside the source code / git repo.
+# A fallback to the URL you gave me is kept here so the app still works even
+# if you forget to set the env var, but for production please set DATABASE_URL
+# in Render instead of relying on the fallback below.
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://postgres.lbypohelsiicjjfucppa:Ilyo%246eey06072009@"
+    "aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true",
+)
+
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+_INDEX_CANDIDATES = [
+    os.path.join(_BASE_DIR, "templates", "index.html"),
+    os.path.join(_BASE_DIR, "index.html"),
+]
+INDEX = next((p for p in _INDEX_CANDIDATES if os.path.exists(p)), _INDEX_CANDIDATES[-1])
 app = FastAPI(title="Chalker")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+
+class Conn:
+    """Thin wrapper so the rest of the file can keep using the same
+    sqlite3-style pattern: c.execute(sql, params).fetchone()/.fetchall(),
+    c.commit(), c.close() -- but talking to Postgres underneath.
+    '?' placeholders are auto-converted to psycopg2's '%s' style so none
+    of the query strings below needed to be rewritten by hand."""
+
+    def __init__(self):
+        self._conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+
+    def execute(self, sql, params=()):
+        cur = self._conn.cursor()
+        cur.execute(sql.replace("?", "%s"), params)
+        return cur
+
+    def executescript(self, sql):
+        cur = self._conn.cursor()
+        cur.execute(sql)
+        return cur
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
+
+
 def db():
-    c = sqlite3.connect(DB); c.row_factory = sqlite3.Row; return c
+    return Conn()
+
 
 def init():
     c = db()
     c.executescript("""
-    CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
+    CREATE TABLE IF NOT EXISTS users(id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL,
       fullname TEXT, school_class TEXT, school_name TEXT, country TEXT, region TEXT, district TEXT,
       role TEXT DEFAULT 'student', birth_date TEXT, hide_birth_date INTEGER DEFAULT 0, bio TEXT,
       heart_status TEXT DEFAULT 'Available', avatar_base64 TEXT, can_post_news INTEGER DEFAULT 0, password TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS posts(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
-      content TEXT, media_base64 TEXT, media_type TEXT, timestamp TEXT DEFAULT CURRENT_TIMESTAMP);
-    CREATE TABLE IF NOT EXISTS comments(id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER NOT NULL,
-      user_id INTEGER NOT NULL, parent_id INTEGER, content TEXT NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP);
-    CREATE TABLE IF NOT EXISTS likes(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
-      post_id INTEGER NOT NULL, is_like INTEGER NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS posts(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
+      content TEXT, media_base64 TEXT, media_type TEXT, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text);
+    CREATE TABLE IF NOT EXISTS comments(id SERIAL PRIMARY KEY, post_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL, parent_id INTEGER, content TEXT NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text);
+    CREATE TABLE IF NOT EXISTS likes(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
+      post_id INTEGER NOT NULL, is_like INTEGER NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text);
     CREATE UNIQUE INDEX IF NOT EXISTS iup ON likes(user_id, post_id);
-    CREATE TABLE IF NOT EXISTS chat_messages(id INTEGER PRIMARY KEY AUTOINCREMENT, sender_id INTEGER NOT NULL,
-      receiver_id INTEGER NOT NULL, message TEXT NOT NULL, image_base64 TEXT, timestamp TEXT DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS chat_messages(id SERIAL PRIMARY KEY, sender_id INTEGER NOT NULL,
+      receiver_id INTEGER NOT NULL, message TEXT NOT NULL, image_base64 TEXT, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text);
     CREATE TABLE IF NOT EXISTS follows(follower_id INTEGER NOT NULL, following_id INTEGER NOT NULL,
       PRIMARY KEY(follower_id, following_id));
-    CREATE TABLE IF NOT EXISTS school_news(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
-      author TEXT, timestamp TEXT DEFAULT CURRENT_TIMESTAMP);
-    CREATE TABLE IF NOT EXISTS news_likes(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
-      news_id INTEGER NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS school_news(id SERIAL PRIMARY KEY, title TEXT NOT NULL,
+      author TEXT, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text);
+    CREATE TABLE IF NOT EXISTS news_likes(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
+      news_id INTEGER NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text);
     CREATE UNIQUE INDEX IF NOT EXISTS iun ON news_likes(user_id, news_id);
-    CREATE TABLE IF NOT EXISTS news_comments(id INTEGER PRIMARY KEY AUTOINCREMENT, news_id INTEGER NOT NULL,
-      user_id INTEGER NOT NULL, content TEXT NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS news_comments(id SERIAL PRIMARY KEY, news_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL, content TEXT NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text);
     CREATE TABLE IF NOT EXISTS ceo_page(id INTEGER PRIMARY KEY, name TEXT, title TEXT, bio TEXT,
       telegram TEXT, instagram TEXT, chalker TEXT);
-    CREATE TABLE IF NOT EXISTS ceo_extra(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, title TEXT, bio TEXT,
-      telegram TEXT, instagram TEXT, chalker TEXT, timestamp TEXT DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS ceo_extra(id SERIAL PRIMARY KEY, name TEXT, title TEXT, bio TEXT,
+      telegram TEXT, instagram TEXT, chalker TEXT, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text);
+    ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS image_base64 TEXT;
+    ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS is_read INTEGER DEFAULT 0;
+    ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS edited INTEGER DEFAULT 0;
     """)
+    c.commit()
     if not c.execute("SELECT id FROM ceo_page WHERE id=1").fetchone():
         c.execute("INSERT INTO ceo_page VALUES(1,?,?,?,?,?,?)",
                   ("Ilyosbek Siddiqjonov", "CEO Founder",
                    "Chalker — o'quvchilar va o'qituvchilar uchun zamonaviy maktab ijtimoiy tarmog'i.",
                    "@ilyos6ee", "@ilyos6ee", "@boss"))
-    existing_cols = [r["name"] for r in c.execute("PRAGMA table_info(chat_messages)").fetchall()]
-    if "image_base64" not in existing_cols:
-        c.execute("ALTER TABLE chat_messages ADD COLUMN image_base64 TEXT")
-    if "is_read" not in existing_cols:
-        c.execute("ALTER TABLE chat_messages ADD COLUMN is_read INTEGER DEFAULT 0")
-    if "edited" not in existing_cols:
-        c.execute("ALTER TABLE chat_messages ADD COLUMN edited INTEGER DEFAULT 0")
     c.commit(); c.close()
 
+
 init()
+
 
 def pub(r):
     d = dict(r); d.pop("password", None); return d
@@ -137,8 +185,9 @@ def register(username: str = Form(...), fullname: str = Form(...), password: str
     c = db()
     if c.execute("SELECT id FROM users WHERE username=?", (u,)).fetchone():
         c.close(); return err("Bu username band!")
-    cur = c.execute("INSERT INTO users(username,fullname,password) VALUES(?,?,?)", (u, fullname.strip(), password))
-    c.commit(); r = urow(c, cur.lastrowid); c.close()
+    cur = c.execute("INSERT INTO users(username,fullname,password) VALUES(?,?,?) RETURNING id", (u, fullname.strip(), password))
+    new_id = cur.fetchone()["id"]
+    c.commit(); r = urow(c, new_id); c.close()
     return {"user": pub(r)}
 
 @app.post("/api/login")
@@ -187,8 +236,8 @@ def get_user(username: str, viewer_id: Optional[int] = None):
     r = c.execute("SELECT * FROM users WHERE username=?", (clean_u(username),)).fetchone()
     if not r: c.close(); return err("Foydalanuvchi topilmadi!", 404)
     d = pub(r)
-    d["followers"] = c.execute("SELECT COUNT(*) FROM follows WHERE following_id=?", (r["id"],)).fetchone()[0]
-    d["following"] = c.execute("SELECT COUNT(*) FROM follows WHERE follower_id=?", (r["id"],)).fetchone()[0]
+    d["followers"] = c.execute("SELECT COUNT(*) AS cnt FROM follows WHERE following_id=?", (r["id"],)).fetchone()["cnt"]
+    d["following"] = c.execute("SELECT COUNT(*) AS cnt FROM follows WHERE follower_id=?", (r["id"],)).fetchone()["cnt"]
     d["is_following"] = bool(viewer_id and c.execute(
         "SELECT 1 FROM follows WHERE follower_id=? AND following_id=?", (viewer_id, r["id"])).fetchone())
     if int(d.get("hide_birth_date") or 0) == 1 and (viewer_id is None or int(viewer_id) != r["id"]):
@@ -240,7 +289,8 @@ def post_like(b: LikeReq):
     if r and r["is_like"] == b.is_like:
         c.execute("DELETE FROM likes WHERE user_id=? AND post_id=?", (b.user_id, b.post_id)); liked = False
     else:
-        c.execute("INSERT OR REPLACE INTO likes(user_id,post_id,is_like) VALUES(?,?,?)",
+        c.execute("""INSERT INTO likes(user_id,post_id,is_like) VALUES(?,?,?)
+                  ON CONFLICT (user_id,post_id) DO UPDATE SET is_like=EXCLUDED.is_like""",
                   (b.user_id, b.post_id, b.is_like)); liked = True
     c.commit(); c.close(); return {"liked": liked}
 
@@ -465,9 +515,11 @@ def ceo_create(b: CeoCreate):
     c = db(); boss = urow(c, b.user_id)
     if not boss or boss["username"] != "boss": c.close(); return err("Faqat @boss!", 403)
     if not b.name.strip(): c.close(); return err("Ism majburiy!")
-    cur = c.execute("INSERT INTO ceo_extra(name,title,bio,telegram,instagram,chalker) VALUES(?,?,?,?,?,?)",
+    cur = c.execute("""INSERT INTO ceo_extra(name,title,bio,telegram,instagram,chalker) VALUES(?,?,?,?,?,?)
+              RETURNING id""",
               (b.name.strip(), b.title.strip(), b.bio.strip(), b.telegram.strip(), b.instagram.strip(), b.chalker.strip()))
-    c.commit(); c.close(); return {"success": True, "id": cur.lastrowid}
+    new_id = cur.fetchone()["id"]
+    c.commit(); c.close(); return {"success": True, "id": new_id}
 
 @app.post("/api/ceo/extra/update")
 def ceo_extra_update(b: CeoExtraUpd):
@@ -489,4 +541,4 @@ def ceo_extra_delete(b: CeoExtraDel):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
