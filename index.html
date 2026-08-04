@@ -90,19 +90,13 @@ img[class*="rounded-full"][onclick]:hover{box-shadow:0 0 0 3px rgba(29,155,240,.
 button[id^="lk-"]:active svg,button[id^="nlk-"]:active svg{animation:heartPop .38s ease}
 
 /* modal */
-#pModal{backdrop-filter:blur(6px) saturate(1.2);-webkit-backdrop-filter:blur(6px) saturate(1.2);transition:opacity .2s ease}
-#pModal>div{animation:popIn .28s cubic-bezier(.2,.8,.3,1) both}
+/* settings/follow/cert modals reuse popIn animation via .anim on inner divs */
 
 /* sticky header blur is already inline; add subtle bottom hairline glow */
 .border-b.brd.p-5.text-center{position:relative}
 .border-b.brd.p-5.text-center::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:linear-gradient(90deg,transparent,rgba(29,155,240,.5),transparent)}
 
 /* ---------- CEO "+" add button ---------- */
-#ceoAddBtn{transition:transform .25s cubic-bezier(.2,.8,.3,1),filter .2s ease,box-shadow .2s ease}
-#ceoAddBtn:hover{transform:rotate(90deg) scale(1.08);filter:brightness(1.15)}
-#ceoAddBtn:active{transform:rotate(90deg) scale(.94)}
-#ceoExtra>div{transition:border-color .2s ease,transform .2s ease}
-#ceoExtra>div:hover{border-color:#43484d;transform:translateY(-2px)}
 button.border.brd{transition:background-color .18s ease,border-color .18s ease,transform .18s ease,color .18s ease}
 button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
 
@@ -114,7 +108,7 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
 .nv.nvactive .nvic{filter:drop-shadow(0 0 6px rgba(29,155,240,.65))}
 
 /* ---------- view transition (fires whenever a view goes from display:none -> flex/block) ---------- */
-#view-feed,#view-news,#view-notif,#view-chat{animation:fu .35s cubic-bezier(.2,.7,.3,1) both}
+#view-feed,#view-news,#view-notif,#view-search,#view-profile{animation:fu .35s cubic-bezier(.2,.7,.3,1) both}
 
 /* ---------- staggered reveal for list items ---------- */
 #feedList .pc:nth-child(1),#newsList .pc:nth-child(1),#ntList>div:nth-child(1){animation-delay:.02s}
@@ -132,9 +126,6 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
 [id^="cl-"]>div:nth-child(2),[id^="ncl-"]>div:nth-child(2){animation-delay:.06s}
 [id^="cl-"]>div:nth-child(3),[id^="ncl-"]>div:nth-child(3){animation-delay:.10s}
 [id^="cl-"]>div:nth-child(n+4),[id^="ncl-"]>div:nth-child(n+4){animation-delay:.12s}
-
-/* ---------- chat bubbles pop in ---------- */
-#chMsgs>div{animation:fadeScaleIn .28s cubic-bezier(.2,.8,.3,1) both}
 
 /* ---------- responsive scale for headline logo/tag ---------- */
 #heroLogo{font-size:1.9rem;line-height:1}
@@ -163,10 +154,54 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
 @media(max-width:1023.98px){
  #appMain{padding-bottom:calc(60px + env(safe-area-inset-bottom,0px))}
 }
-.chat-h{height:calc(100vh - 120px)}
-@media(max-width:1023.98px){
- .chat-h{height:calc(100vh - 120px - 60px - env(safe-area-inset-bottom,0px))}
-}
+
+/* ---------- pro sticker style for like / comment buttons ---------- */
+.stk{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:999px;font-weight:700;font-size:12.5px;
+ background:linear-gradient(180deg,#15171a,#0a0b0d);border:1px solid var(--brd);box-shadow:0 2px 8px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.04);
+ transition:transform .15s cubic-bezier(.2,.8,.3,1),border-color .18s ease,box-shadow .18s ease,background .18s ease,color .18s ease}
+.stk:hover{border-color:#3d4146;transform:translateY(-1px)}
+.stk:active{transform:translateY(0) scale(.94)}
+.stk.stk-like.on{background:linear-gradient(180deg,rgba(249,24,128,.22),rgba(249,24,128,.06));border-color:rgba(249,24,128,.55);color:#ff5c9c;box-shadow:0 2px 10px rgba(249,24,128,.25),inset 0 1px 0 rgba(255,255,255,.06)}
+.stk.stk-cm{color:#9aa0a6}
+.stk.stk-cm:hover{color:#5cb8ff;border-color:rgba(29,155,240,.4)}
+.stk svg{width:14px;height:14px}
+.cstk{padding:3px 9px;font-size:11px}
+.cstk svg{width:12px;height:12px}
+
+/* ---------- lightbox ---------- */
+#lightbox{backdrop-filter:blur(10px) saturate(1.1);-webkit-backdrop-filter:blur(10px) saturate(1.1);transition:opacity .2s ease}
+#lightbox img{animation:fadeScaleIn .25s cubic-bezier(.2,.8,.3,1) both;max-height:92vh;max-width:94vw}
+[data-lb]{cursor:zoom-in}
+
+/* ---------- gear settings button ---------- */
+.gearBtn{width:38px;height:38px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:var(--surface);border:1px solid var(--brd);color:#d6d9db;transition:transform .3s ease,border-color .2s ease,background .2s ease}
+.gearBtn:hover{border-color:var(--sky);color:#fff;transform:rotate(45deg)}
+.gearBtn:active{transform:rotate(70deg) scale(.92)}
+
+/* ---------- trophy cabinet ---------- */
+.trophyGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:14px}
+.trophyCard{position:relative;aspect-ratio:3/4;border-radius:16px;overflow:hidden;cursor:pointer;
+ background:linear-gradient(155deg,#241c07,#0a0a0a 55%,#1a1305);border:1px solid rgba(251,191,36,.35);
+ box-shadow:0 6px 20px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08);transition:transform .25s cubic-bezier(.2,.8,.3,1),box-shadow .25s ease}
+.trophyCard::before{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.22) 45%,transparent 60%);background-size:220% 220%;background-position:120% 0;transition:background-position .7s ease}
+.trophyCard:hover{transform:translateY(-4px) scale(1.035) rotate(-.5deg);box-shadow:0 14px 34px rgba(251,191,36,.28)}
+.trophyCard:hover::before{background-position:-20% 100%}
+.trophyCard img{width:100%;height:68%;object-fit:cover;display:block}
+.trophyCard .tcap{position:absolute;left:0;right:0;bottom:0;padding:6px 8px;font-size:10.5px;font-weight:800;text-align:center;color:#ffe9ad;background:linear-gradient(0deg,rgba(0,0,0,.85),transparent);line-height:1.15}
+.trophyCard .tvb{position:absolute;top:5px;right:5px;width:18px;height:18px;filter:drop-shadow(0 0 5px rgba(29,155,240,.8))}
+.trophyCard .tdel{position:absolute;top:4px;left:4px;width:22px;height:22px;border-radius:999px;background:rgba(0,0,0,.65);
+ border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;color:#fca5a5;font-size:13px;
+ font-weight:900;line-height:1;z-index:2;transition:background .15s ease,transform .15s ease}
+.trophyCard .tdel:hover{background:rgba(220,38,38,.85);color:#fff;transform:scale(1.1)}
+#certModal{backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#certModal .certBig{width:min(78vw,320px);border-radius:22px;overflow:hidden;position:relative;
+ background:linear-gradient(160deg,#2b2107,#0a0a0a 55%,#1c1506);border:1px solid rgba(251,191,36,.5);
+ box-shadow:0 0 0 1px rgba(251,191,36,.15),0 20px 60px rgba(251,191,36,.22),0 20px 60px rgba(0,0,0,.6);animation:popIn .3s cubic-bezier(.2,.8,.3,1) both}
+#certModal .certBig img{width:100%;display:block}
+#certModal .certGlow{position:absolute;inset:0;background:linear-gradient(120deg,transparent 30%,rgba(255,255,255,.28) 48%,transparent 66%);background-size:250% 250%;animation:shimmer 2.6s linear infinite;pointer-events:none;mix-blend-mode:overlay}
+
+/* ---------- profile header ---------- */
+.pcover{height:80px;background:linear-gradient(120deg,#0d2b3f,#08131c 60%,#1a0d1e)}
 </style>
 </head>
 <body>
@@ -228,7 +263,7 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
      </div>
      <div class="flex items-center justify-between mt-2 border-t brd pt-3">
       <label class="cursor-pointer text-sky-500 rounded-full px-3 py-1.5 text-sm font-semibold hover:bg-sky-500/10">
-       &#128444; <span id="tMd"></span><input id="mInp" type="file" accept="image/*,video/*" class="hide" onchange="pickMedia(this)"></label>
+       &#128444; <span id="tMd"></span><input id="mInp" type="file" accept="image/*" class="hide" onchange="pickMedia(this)"></label>
       <button onclick="createPost()" class="bb text-white font-bold rounded-full px-7 py-2">Chalk</button>
      </div>
     </div>
@@ -246,9 +281,124 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
 
   <div id="view-notif" class="hide"><div id="ntList" class="p-3 space-y-2"></div></div>
 
-  <div id="view-profile" class="hide"><div class="p-4 sm:p-6 max-w-lg space-y-4 anim">
+  <div id="view-profile" class="hide">
+   <div class="pcover"></div>
+   <div class="p-4 sm:p-6 max-w-lg space-y-4 anim -mt-10">
+    <div class="flex items-end justify-between">
+     <img id="vpAv" class="w-20 h-20 rounded-full object-cover bg-neutral-800 border-4 border-black shrink-0">
+     <div class="flex items-center gap-2 mb-1">
+      <button id="vpFollowBtn" onclick="tglFollowVP()" class="hide bb text-white font-bold rounded-full px-5 py-2 text-sm"></button>
+      <button id="vpGear" onclick="openSettings()" class="hide gearBtn" title="Settings">
+       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+     </div>
+    </div>
+    <div>
+     <h2 id="vpName" class="text-xl font-extrabold"></h2>
+     <p id="vpUn" class="text-gray-500 text-sm"></p>
+     <p class="text-xs font-bold mt-1"><span id="vpRole" class="text-sky-500"></span><span id="vpHeart" class="text-gray-500"></span></p>
+     <p id="vpMeta" class="text-xs text-gray-500 mt-1"></p>
+     <p id="vpBio" class="text-gray-300 text-sm mt-2 italic"></p>
+     <p id="vpUniv" class="text-xs text-amber-400 mt-1 font-semibold"></p>
+    </div>
+    <div class="flex gap-5 text-sm">
+     <span class="cursor-pointer hover:underline" onclick="openFollowList('followers')"><b id="vpFw">0</b> <span id="tFwLbl" class="text-gray-500"></span></span>
+     <span class="cursor-pointer hover:underline" onclick="openFollowList('following')"><b id="vpFg">0</b> <span id="tFgLbl" class="text-gray-500"></span></span>
+    </div>
+    <div>
+     <div class="flex items-center justify-between border-t brd pt-4 mb-2">
+      <p id="tTrophy" class="text-sm font-bold text-amber-400"></p>
+      <button id="addCertBtn" onclick="toggleCertForm()" class="hide text-xs font-bold text-amber-400 border border-amber-500/50 rounded-full px-3 py-1 hover:bg-amber-500/10">+ <span id="tAddCert"></span></button>
+     </div>
+     <div id="certFormBox" class="hide space-y-2 mb-3 border brd rounded-2xl p-3 panel">
+      <input id="ctTitle" placeholder="" class="inp">
+      <label class="cursor-pointer text-xs text-sky-500 font-semibold inline-block"><span id="tCtImg"></span>
+       <input id="ctImg" type="file" accept="image/*" class="hide" onchange="pickCertImg(this)"></label>
+      <button onclick="addOwnCert()" class="w-full bb text-white font-bold rounded-full py-2 text-sm"><span id="tCtAdd"></span></button>
+     </div>
+     <div id="trophyGrid" class="trophyGrid"></div>
+     <p id="noTrMsg" class="hide text-gray-600 text-xs"></p>
+    </div>
+    <div>
+     <p id="tMyPosts" class="text-sm font-bold text-sky-500 mb-2 border-t brd pt-4"></p>
+     <div id="vpPosts"></div>
+    </div>
+   </div>
+  </div>
+
+  <div id="view-search" class="hide">
+   <div class="border-b brd p-3 sm:p-4 sticky top-0 z-10" style="background:rgba(0,0,0,.85);backdrop-filter:blur(10px)">
+    <div class="relative">
+     <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+     <input id="srchInp" oninput="doSearch()" placeholder="" class="inp pl-10">
+    </div>
+   </div>
+   <div id="srchList" class="p-2"></div>
+  </div>
+
+  <div id="view-support" class="hide lg:hidden p-4 sm:p-6 max-w-lg space-y-4 anim">
+   <div class="border brd rounded-2xl p-4 panel">
+    <h3 id="tSupportM" class="font-extrabold text-base mb-3 text-sky-500"></h3>
+    <div id="supportShowM" class="space-y-1"></div>
+    <div id="supportEditWrapM" class="hide mt-3 pt-3 border-t brd space-y-2">
+     <select id="scTypeM" class="inp">
+      <option value="Humo">Humo</option><option value="Uzcard">Uzcard</option><option value="Visa">Visa</option>
+     </select>
+     <input id="scNumberM" placeholder="8600 0000 0000 0000" class="inp">
+     <input id="scHolderM" placeholder="IL***** S*****" class="inp">
+     <button id="tSupSaveM" onclick="saveSupport()" class="w-full bb text-white font-bold rounded-full py-2.5 text-sm"></button>
+    </div>
+    <button id="supEditBtnM" onclick="toggleSupportEdit()" class="hide mt-3 w-full border brd rounded-full py-2 text-xs font-bold hover:bg-neutral-900"></button>
+   </div>
+   <div class="text-center text-[11px] text-gray-600 leading-relaxed pb-2">
+    <p>CEO Founder - Ilyosbek Siddiqjonov</p><p>Copyright &copy; 2026 Chalker</p>
+   </div>
+  </div>
+ </main>
+
+ <aside class="w-72 shrink-0 p-4 sticky top-0 h-screen hidden lg:flex lg:flex-col lg:justify-between">
+  <div class="space-y-4">
+   <div id="bossPanel" class="hide border brd rounded-2xl p-4 panel">
+    <h3 class="font-extrabold text-base mb-1 text-amber-400">&#128081; Boss</h3>
+    <p id="tBD" class="text-xs text-gray-500 mb-3"></p>
+    <input id="gU" placeholder="@username" class="inp mb-2">
+    <button id="tGr" onclick="grantNews()" class="w-full border border-amber-500/50 text-amber-400 font-bold rounded-full py-2 text-sm hover:bg-amber-500/10"></button>
+   </div>
+
+   <div class="border brd rounded-2xl p-4 panel">
+    <h3 id="tSupport" class="font-extrabold text-base mb-3 text-sky-500"></h3>
+    <div id="supportShow" class="space-y-1"></div>
+    <div id="supportEditWrap" class="hide mt-3 pt-3 border-t brd space-y-2">
+     <select id="scType" class="inp">
+      <option value="Humo">Humo</option>
+      <option value="Uzcard">Uzcard</option>
+      <option value="Visa">Visa</option>
+     </select>
+     <input id="scNumber" placeholder="8600 0000 0000 0000" class="inp">
+     <input id="scHolder" placeholder="IL***** S*****" class="inp">
+     <button id="tSupSave" onclick="saveSupport()" class="w-full bb text-white font-bold rounded-full py-2.5 text-sm"></button>
+    </div>
+    <button id="supEditBtn" onclick="toggleSupportEdit()" class="hide mt-3 w-full border brd rounded-full py-2 text-xs font-bold hover:bg-neutral-900"></button>
+   </div>
+  </div>
+
+  <div class="text-center text-[11px] text-gray-600 leading-relaxed pb-2">
+   <p>CEO Founder - Ilyosbek Siddiqjonov</p>
+   <p>Copyright &copy; 2026 Chalker</p>
+  </div>
+ </aside>
+
+ <nav id="bottomNavBox" class="lg:hidden fixed bottom-0 inset-x-0 z-30 flex items-stretch"></nav>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div id="settingsModal" class="hide fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)hd('settingsModal')">
+ <div class="bg-black border brd rounded-2xl sm:rounded-3xl w-full max-w-md p-5 sm:p-6 relative anim panel max-h-[90vh] overflow-y-auto">
+  <button onclick="hd('settingsModal')" class="absolute top-3 right-4 text-gray-500 text-xl">&#10005;</button>
+  <h3 id="tSettings" class="text-lg font-extrabold mb-4"></h3>
+  <div class="space-y-4">
    <div class="flex items-center gap-4">
-    <img id="pAv" class="w-20 h-20 rounded-full object-cover bg-neutral-800 border-2 border-sky-500/40">
+    <img id="pAv" class="w-16 h-16 rounded-full object-cover bg-neutral-800 border-2 border-sky-500/40">
     <label class="cursor-pointer bb text-white text-sm font-bold rounded-full px-5 py-2.5"><span id="tAvt"></span>
      <input type="file" accept="image/*" class="hide" onchange="pickAvatar(this)"></label>
    </div>
@@ -256,9 +406,9 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
    <div><label id="tRl" class="text-gray-500 text-xs font-bold"></label>
     <select id="pRole" class="inp"><option value="student"></option><option value="teacher"></option></select></div>
    <div><label class="text-gray-500 text-xs font-bold">BIO</label><textarea id="pBio" rows="3" class="inp resize-none"></textarea></div>
+   <div><label id="tUniv" class="text-gray-500 text-xs font-bold"></label><input id="pUniv" type="text" class="inp"></div>
    <div class="border brd rounded-2xl p-4 space-y-3 panel">
     <p id="tGeo" class="text-sm font-bold text-sky-500"></p>
-    <div><label id="tCt" class="text-gray-500 text-xs font-bold"></label><select id="pCt" onchange="onCt()" class="inp"></select></div>
     <div><label id="tRg" class="text-gray-500 text-xs font-bold"></label><select id="pRg" onchange="onRg()" class="inp"></select></div>
     <div><label id="tSc" class="text-gray-500 text-xs font-bold"></label><select id="pSc" onchange="onSc()" class="inp"></select></div>
     <div><label id="tKl" class="text-gray-500 text-xs font-bold"></label><select id="pKl" class="inp"></select></div>
@@ -269,126 +419,60 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
    </div>
    <div><label id="tHt" class="text-gray-500 text-xs font-bold"></label>
     <select id="pHt" class="inp"><option value="Available"></option><option value="Complicated"></option><option value="Locked"></option><option value="Private"></option></select></div>
+   <div><label id="tLang" class="text-gray-500 text-xs font-bold"></label>
+    <select id="pLang" onchange="changeLang(this.value)" class="inp">
+     <option value="uz">O'zbekcha</option><option value="en">English</option><option value="ru">Русский</option>
+    </select></div>
    <button id="tSv" onclick="saveProfile()" class="bb text-white font-bold rounded-full py-3 w-full"></button>
-   <div class="border brd rounded-2xl p-4 space-y-3 mt-6 panel">
+   <div class="border brd rounded-2xl p-4 space-y-3 mt-2 panel">
     <p id="tAc" class="text-sm font-bold text-amber-400"></p>
     <input id="aU" oninput="chkU('aU','aH',me.id)" class="inp"><p id="aH" class="text-xs h-4"></p>
     <div class="relative"><input id="aC" type="password" class="inp pr-12"><button type="button" id="e1" onclick="tEye('aC','e1')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"></button></div>
     <div class="relative"><input id="aN" type="password" class="inp pr-12"><button type="button" id="e2" onclick="tEye('aN','e2')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"></button></div>
     <button id="tAB" onclick="saveAccount()" class="w-full border border-amber-500/50 text-amber-400 font-bold rounded-full py-2.5 text-sm hover:bg-amber-500/10"></button>
    </div>
-  </div></div>
-
-  <div id="view-chat" class="hide flex flex-col chat-h">
-   <div class="flex flex-1 min-h-0">
-    <div class="w-[86px] sm:w-48 md:w-56 shrink-0 border-r brd flex flex-col transition-[width] duration-300">
-     <div class="p-2 sm:p-3 border-b brd flex items-center justify-between">
-      <h2 id="tCh" class="font-bold text-sm hidden sm:block"></h2>
-      <button id="tNC" onclick="newChat()" class="bb text-white text-xs font-bold rounded-full px-2.5 sm:px-3 py-1.5 mx-auto sm:mx-0"></button>
-     </div>
-     <div id="chatUsers" class="flex-1 overflow-y-auto"></div>
-    </div>
-    <div class="flex-1 flex flex-col min-w-0">
-     <div id="chHead" class="border-b brd p-2.5 sm:p-3 text-sm text-gray-500"></div>
-     <div id="chMsgs" class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-1.5"></div>
-     <div id="chEditBar" class="hide px-3 sm:px-4 py-1.5 text-xs text-sky-400 border-t brd flex items-center justify-between">
-      <span id="tEditing"></span>
-      <span class="cursor-pointer text-gray-500 hover:text-red-400 font-semibold" onclick="cancelEditMsg()">&#10005;</span>
-     </div>
-     <div id="chBar" class="hide p-2.5 sm:p-3 flex gap-2 items-center border-t brd">
-      <input id="chInp" onkeydown="if(event.key==='Enter')sendMsg()" class="flex-1 bg-neutral-900 border brd rounded-full px-4 sm:px-5 py-2.5 sm:py-3 text-sm">
-      <button onclick="sendMsg()" class="bb text-white rounded-full w-10 h-10 sm:w-11 sm:h-11 shrink-0 font-bold">&#10148;</button>
-     </div>
-    </div>
-   </div>
-  </div>
-
-  <div id="view-lang" class="hide p-5 sm:p-10 max-w-md mx-auto space-y-4">
-   <button onclick="setLang('uz')" class="lang-card anim"><span class="text-3xl">&#127482;&#127487;</span><span>O'zbekcha<br><span class="text-xs text-gray-500 font-normal">Uzbek tili</span></span><span class="ml-auto text-sky-500 text-xl">&#10148;</span></button>
-   <button onclick="setLang('en')" class="lang-card anim" style="animation-delay:.08s"><span class="text-3xl">&#127468;&#127463;</span><span>English<br><span class="text-xs text-gray-500 font-normal">English language</span></span><span class="ml-auto text-sky-500 text-xl">&#10148;</span></button>
-   <button onclick="setLang('ru')" class="lang-card anim" style="animation-delay:.16s"><span class="text-3xl">&#127479;&#127482;</span><span>&#1056;&#1091;&#1089;&#1089;&#1082;&#1080;&#1081;<br><span class="text-xs text-gray-500 font-normal">Russian</span></span><span class="ml-auto text-sky-500 text-xl">&#10148;</span></button>
-  </div>
-
-  <div id="view-ceo" class="hide p-4 sm:p-8 flex justify-center">
-   <div class="border brd rounded-2xl sm:rounded-3xl p-5 sm:p-8 max-w-md text-center w-full anim panel">
-    <div class="flex justify-end"><button id="ceoEB" onclick="tCeoEdit()" class="hide border brd rounded-full px-4 py-1 text-xs font-bold hover:bg-neutral-900"></button></div>
-    <div id="ceoIn" class="w-24 h-24 mx-auto rounded-full bb flex items-center justify-center text-4xl font-extrabold text-white mb-4">IS</div>
-    <div id="ceoShow">
-     <h3 id="cNm" class="text-2xl font-extrabold"></h3><p id="cTt" class="text-sky-500 font-semibold mt-1"></p>
-     <p id="cBi" class="text-gray-400 text-sm mt-4"></p>
-     <div id="cLk" class="flex flex-col items-center gap-2 mt-6 text-sm"></div>
-    </div>
-    <div id="ceoForm" class="hide text-left space-y-3 mt-2">
-     <input id="fNm" class="inp"><input id="fTt" class="inp"><textarea id="fBi" rows="4" class="inp resize-none"></textarea>
-     <input id="fTg" class="inp"><input id="fIg" class="inp"><input id="fCh" class="inp">
-     <button id="tCS" onclick="saveCeo()" class="bb text-white font-bold rounded-full py-3 w-full"></button>
-    </div>
-
-    <div id="ceoExtra" class="mt-6 space-y-4 text-left"></div>
-
-    <div id="ceoAddWrap" class="hide mt-6 pt-5 border-t brd">
-     <div class="flex justify-center">
-      <button id="ceoAddBtn" onclick="toggleCeoAddForm()" class="flex items-center justify-center w-12 h-12 rounded-full bb text-white text-2xl font-bold leading-none shrink-0" title="+" aria-label="+">+</button>
-     </div>
-     <div id="ceoAddForm" class="hide text-left space-y-3 mt-4">
-      <p id="tAddCeo" class="text-sm font-bold text-sky-500"></p>
-      <input id="acNm" class="inp"><input id="acTt" class="inp"><textarea id="acBi" rows="3" class="inp resize-none"></textarea>
-      <input id="acTg" class="inp"><input id="acIg" class="inp"><input id="acCh" class="inp">
-      <button id="tACS" onclick="addCeo()" class="bb text-white font-bold rounded-full py-3 w-full"></button>
-     </div>
-    </div>
-   </div>
-  </div>
- </main>
-
- <aside class="w-72 shrink-0 p-4 sticky top-0 h-screen hidden lg:block">
-  <div id="bossPanel" class="hide border brd rounded-2xl p-4 panel">
-   <h3 class="font-extrabold text-base mb-1 text-amber-400">&#128081; Boss</h3>
-   <p id="tBD" class="text-xs text-gray-500 mb-3"></p>
-   <input id="gU" placeholder="@username" class="inp mb-2">
-   <button id="tGr" onclick="grantNews()" class="w-full border border-amber-500/50 text-amber-400 font-bold rounded-full py-2 text-sm hover:bg-amber-500/10"></button>
-  </div>
- </aside>
-
- <nav id="bottomNavBox" class="lg:hidden fixed bottom-0 inset-x-0 z-30 flex items-stretch"></nav>
-</div>
-
-<div id="pModal" class="hide fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeModal()">
- <div class="bg-black border brd rounded-2xl sm:rounded-3xl w-full max-w-sm p-5 sm:p-6 relative anim panel">
-  <button onclick="closeModal()" class="absolute top-3 right-4 text-gray-500 text-xl">&#10005;</button>
-  <div class="text-center">
-   <img id="mAv" class="w-24 h-24 rounded-full object-cover bg-neutral-800 mx-auto mb-3 border-2 border-sky-500/40">
-   <h3 id="mFn" class="text-xl font-extrabold"></h3><p id="mUn" class="text-gray-500 text-sm"></p><p id="mRl" class="text-sky-500 text-xs font-bold"></p>
-   <div class="flex justify-center gap-6 my-4 text-sm">
-    <span><b id="mFw">0</b> <span class="text-gray-500">Followers</span></span>
-    <span><b id="mFg">0</b> <span class="text-gray-500">Following</span></span>
-   </div>
-   <div class="text-left text-sm space-y-2 border brd rounded-2xl p-4">
-    <p><span class="text-gray-500" id="qRg"></span> <span id="mRg"></span></p>
-    <p><span class="text-gray-500" id="qKl"></span> <span id="mKl"></span></p>
-    <p><span class="text-gray-500" id="qBd"></span> <span id="mBd"></span></p>
-    <p><span class="text-gray-500" id="qHt"></span> <span id="mHt"></span></p>
-    <p id="mBi" class="text-gray-300 italic pt-1"></p>
-   </div>
-   <div id="mAct" class="flex gap-2 mt-4">
-    <button id="mFB" onclick="tglFollow()" class="flex-1 bb text-white font-bold rounded-full py-2.5 text-sm"></button>
-    <button id="qMs" onclick="dmModal()" class="flex-1 border brd font-bold rounded-full py-2.5 text-sm hover:bg-neutral-900"></button>
-   </div>
   </div>
  </div>
+</div>
+
+<!-- FOLLOW LIST MODAL -->
+<div id="followModal" class="hide fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)hd('followModal')">
+ <div class="bg-black border brd rounded-2xl sm:rounded-3xl w-full max-w-sm p-5 relative anim panel max-h-[80vh] flex flex-col">
+  <button onclick="hd('followModal')" class="absolute top-3 right-4 text-gray-500 text-xl">&#10005;</button>
+  <h3 id="tFollowModal" class="text-lg font-extrabold mb-3"></h3>
+  <div id="followListBox" class="overflow-y-auto space-y-1"></div>
+ </div>
+</div>
+
+<!-- CERTIFICATE BIG MODAL -->
+<div id="certModal" class="hide fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)hd('certModal')">
+ <div class="certBig">
+  <div class="certGlow"></div>
+  <img id="certBigImg">
+  <div class="p-3 text-center relative">
+   <p id="certBigTitle" class="font-extrabold text-amber-300 text-sm"></p>
+   <p class="text-[10px] text-sky-400 font-bold mt-1">&#9989; <span id="tVerified"></span></p>
+   <button id="certDelBtn" class="hide mt-2 text-[11px] text-red-400 font-bold border border-red-500/40 rounded-full px-3 py-1 hover:bg-red-500/10"><span id="tDelCert"></span></button>
+  </div>
+ </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div id="lightbox" class="hide fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4" onclick="closeLightbox()">
+ <img id="lbImg" class="rounded-xl">
 </div>
 <script>
 "use strict";
 var API=window.location.origin+"/api";
-var me=null,partner=null,mUser=null,pollT=null,ntT=null,uT=null;
-var mB64=null,mType=null,avB64=null,rT={},oC={},oNC={},pCache={},nCache={},ceoExtraCache={},ceoEditId=null;
+var me=null,mUser=null,ntT=null,uT=null;
+var mB64=null,mType=null,avB64=null,rT={},oC={},oNC={},pCache={},nCache={},certCache={};
 var LANG=localStorage.getItem("chalker_lang")||"uz";
 window.onerror=function(m,s,l){alert("JS xato: "+m+" ("+l+")")};
 
 var TR={
-uz:{slogan:"Maktab ijtimoiy tarmog'i",tag:"Fikrlaring bilan maktabni bo'yab tashla!",lg:"Kirish",rg:"Ro'yxatdan o'tish",na:"Akkount yo'qmi?",ha:"Akkount bormi?",un:"Username",pw:"Parol",fn:"To'liq ism",uT:"Band",uF:"Bo'sh",v1:"Chalking",v2:"Yangiliklar",v3:"Profil",v4:"Chat",v5:"Bildirishnoma",v6:"Til",v7:"CEO",out:"Chiqish",wh:"Nima gaplar?!",md:"Rasm/Video",ef:"Postlar yo'q. Birinchi bo'l!",av:"Avatar",rl:"MAQOM",st:"O'quvchi",tc:"O'qituvchi",geo:"Hudud va maktab",ct:"DAVLAT",rgn:"VILOYAT",sc:"MAKTAB",kl:"SINF",c1:"Davlatni tanlang",c2:"Viloyatni tanlang",c4:"Maktabni tanlang",c5:"Sinfni tanlang",bd:"TUG'ILGAN KUN",hd:"Yashirish",ht:"YURAK",hA:"Bo'sh",hC:"Murakkab",hL:"Band",hP:"Sir",sv:"Saqlash",svd:"Saqlandi!",ac:"Akkount xavfsizligi",aU:"Yangi username",aC:"Joriy parol",aN:"Yangi parol",up:"Yangilash",chs:"Chatlar",nc:"+ Yangi",slc:"Suhbatni tanlang",mp:"Xabar yozing...",nch:"Suhbatlar yo'q",pu:"Username kiriting:",np:"Yangi e'lon...",pb:"E'lon qilish",nn:"Yangiliklar yo'q",bd2:"Yangilik huquqini berish/olish",gr:"Huquqni almashtirish",ed:"Tahrirlash",dl:"O'chirish",fl:"Follow",uf:"Unfollow",sm:"Xabar yozish",hdn:"Yashirin",rp:"Javob yozing...",snd:"Yuborish",fc:"Birinchi komment yoz",cn:"bekor",cd:"Rostdan o'chirasizmi?",ep:"Yangi matn:",rpl:"Javob",nnt:"Bildirishnomalar yo'q",l1:"yurakcha bosdi",l2:"komment yozdi",l3:"xabar yubordi",l4:"yangi e'lon",cN:"Ism",cT:"Lavozim",cB:"Bio",addCeo:"Yangi CEO qo'shish",today:"Bugun",yesterday:"Kecha",editedTag:"(tahrirlangan)",editingMsg:"Xabar tahrirlanmoqda..."},
-en:{slogan:"School social network",tag:"Chalk up your school with your thoughts!",lg:"Log in",rg:"Sign up",na:"No account?",ha:"Have an account?",un:"Username",pw:"Password",fn:"Full name",uT:"Taken",uF:"Available",v1:"Chalking",v2:"News",v3:"Profile",v4:"Chat",v5:"Notifications",v6:"Language",v7:"CEO",out:"Log out",wh:"What's happening?!",md:"Image/Video",ef:"No posts yet. Be first!",av:"Avatar",rl:"ROLE",st:"Student",tc:"Teacher",geo:"Region & school",ct:"COUNTRY",rgn:"REGION",sc:"SCHOOL",kl:"CLASS",c1:"Select country",c2:"Select region",c4:"Select school",c5:"Select class",bd:"BIRTHDAY",hd:"Hide",ht:"HEART",hA:"Available",hC:"Complicated",hL:"Locked",hP:"Private",sv:"Save",svd:"Saved!",ac:"Account security",aU:"New username",aC:"Current password",aN:"New password",up:"Update",chs:"Chats",nc:"+ New",slc:"Select a chat",mp:"Type a message...",nch:"No chats",pu:"Enter username:",np:"New announcement...",pb:"Publish",nn:"No news",bd2:"Grant/revoke news rights",gr:"Toggle rights",ed:"Edit",dl:"Delete",fl:"Follow",uf:"Unfollow",sm:"Message",hdn:"Hidden",rp:"Write a reply...",snd:"Send",fc:"Be first to comment",cn:"cancel",cd:"Really delete?",ep:"New text:",rpl:"Reply",nnt:"No notifications",l1:"liked your post",l2:"commented",l3:"sent a message",l4:"new announcement",cN:"Name",cT:"Title",cB:"Bio",addCeo:"Add new CEO",today:"Today",yesterday:"Yesterday",editedTag:"(edited)",editingMsg:"Editing message..."},
-ru:{slogan:"Школьная соцсеть",tag:"Раскрась школу своими мыслями!",lg:"Войти",rg:"Регистрация",na:"Нет аккаунта?",ha:"Есть аккаунт?",un:"Имя пользователя",pw:"Пароль",fn:"Полное имя",uT:"Занято",uF:"Свободно",v1:"Chalking",v2:"Новости",v3:"Профиль",v4:"Чат",v5:"Уведомления",v6:"Язык",v7:"CEO",out:"Выйти",wh:"Что нового?!",md:"Фото/Видео",ef:"Постов нет. Будьте первым!",av:"Аватар",rl:"СТАТУС",st:"Ученик",tc:"Учитель",geo:"Регион и школа",ct:"СТРАНА",rgn:"ОБЛАСТЬ",sc:"ШКОЛА",kl:"КЛАСС",c1:"Выберите страну",c2:"Выберите область",c4:"Выберите школу",c5:"Выберите класс",bd:"ДЕНЬ РОЖДЕНИЯ",hd:"Скрыть",ht:"СЕРДЦЕ",hA:"Свободен(а)",hC:"Всё сложно",hL:"Занят(а)",hP:"Секрет",sv:"Сохранить",svd:"Сохранено!",ac:"Безопасность",aU:"Новый username",aC:"Текущий пароль",aN:"Новый пароль",up:"Обновить",chs:"Чаты",nc:"+ Новый",slc:"Выберите чат",mp:"Сообщение...",nch:"Чатов нет",pu:"Введите username:",np:"Новое объявление...",pb:"Опубликовать",nn:"Новостей нет",bd2:"Право на новости",gr:"Переключить право",ed:"Изменить",dl:"Удалить",fl:"Подписаться",uf:"Отписаться",sm:"Написать",hdn:"Скрыто",rp:"Ответ...",snd:"Отправить",cn:"отмена",fc:"Будьте первым",cd:"Точно удалить?",ep:"Новый текст:",rpl:"Ответить",nnt:"Уведомлений нет",l1:"понравился ваш пост",l2:"комментировал",l3:"отправил сообщение",l4:"новое объявление",cN:"Имя",cT:"Должность",cB:"Био",addCeo:"Добавить нового CEO",today:"Сегодня",yesterday:"Вчера",editedTag:"(изменено)",editingMsg:"Редактирование сообщения..."}};
+uz:{slogan:"Maktab ijtimoiy tarmog'i",tag:"Fikrlaring bilan maktabni bo'yab tashla!",lg:"Kirish",rg:"Ro'yxatdan o'tish",na:"Akkount yo'qmi?",ha:"Akkount bormi?",un:"Username",pw:"Parol",fn:"To'liq ism",uT:"Band",uF:"Bo'sh",v1:"Chalking",v2:"Yangiliklar",v3:"Profil",v4:"Chat",v5:"Bildirishnoma",v6:"Til",v7:"CEO",out:"Chiqish",wh:"Nima gaplar?!",md:"Rasm",ef:"Postlar yo'q. Birinchi bo'l!",av:"Avatar",rl:"MAQOM",st:"O'quvchi",tc:"O'qituvchi",geo:"Hudud va maktab",ct:"DAVLAT",rgn:"VILOYAT",sc:"MAKTAB",kl:"SINF",c1:"Davlatni tanlang",c2:"Viloyatni tanlang",c4:"Maktabni tanlang",c5:"Sinfni tanlang",bd:"TUG'ILGAN KUN",hd:"Yashirish",ht:"YURAK",hA:"Bo'sh",hC:"Murakkab",hL:"Band",hP:"Sir",sv:"Saqlash",svd:"Saqlandi!",ac:"Akkount xavfsizligi",aU:"Yangi username",aC:"Joriy parol",aN:"Yangi parol",up:"Yangilash",chs:"Chatlar",nc:"+ Yangi",slc:"Suhbatni tanlang",mp:"Xabar yozing...",nch:"Suhbatlar yo'q",pu:"Username kiriting:",np:"Yangi e'lon...",pb:"E'lon qilish",nn:"Yangiliklar yo'q",bd2:"Yangilik huquqini berish/olish",gr:"Huquqni almashtirish",ed:"Tahrirlash",dl:"O'chirish",fl:"Follow",uf:"Unfollow",sm:"Xabar yozish",hdn:"Yashirin",rp:"Javob yozing...",snd:"Yuborish",fc:"Birinchi komment yoz",cn:"bekor",cd:"Rostdan o'chirasizmi?",ep:"Yangi matn:",rpl:"Javob",nnt:"Bildirishnomalar yo'q",l1:"yurakcha bosdi",l2:"komment yozdi",l3:"xabar yubordi",l4:"yangi e'lon",cN:"Ism",cT:"Lavozim",cB:"Bio",addCeo:"Yangi CEO qo'shish",today:"Bugun",yesterday:"Kecha",editedTag:"(tahrirlangan)",editingMsg:"Xabar tahrirlanmoqda...",vS:"Qidiruv",srchPh:"Foydalanuvchi qidirish...",nosr:"Hech kim topilmadi",noCard:"Karta hali kiritilmagan",supTitle:"Homiylik",supEdit:"Tahrirlash",settings:"Sozlamalar",trophy:"Trophy Cabinet",noTr:"Sertifikatlar hali yo'q",univ:"Qaysi oliygohga topshiryapsiz?",univPh:"Masalan: TATU, INHA, Milliy universitet...",lang:"TIL",followers:"Obunachilar",following:"Obunalar",noFol:"Hozircha hech kim yo'q",myPosts:"Postlari",noMyPosts:"Postlar yo'q",verified:"Tasdiqlangan",addCert:"Sertifikat berish",certTitle:"Sertifikat nomi",certUser:"@username",certImg:"Rasm biriktirish",certAdd:"Berish",closeX:"Yopish",support:"Homiylik"},
+en:{slogan:"School social network",tag:"Chalk up your school with your thoughts!",lg:"Log in",rg:"Sign up",na:"No account?",ha:"Have an account?",un:"Username",pw:"Password",fn:"Full name",uT:"Taken",uF:"Available",v1:"Chalking",v2:"News",v3:"Profile",v4:"Chat",v5:"Notifications",v6:"Language",v7:"CEO",out:"Log out",wh:"What's happening?!",md:"Image",ef:"No posts yet. Be first!",av:"Avatar",rl:"ROLE",st:"Student",tc:"Teacher",geo:"Region & school",ct:"COUNTRY",rgn:"REGION",sc:"SCHOOL",kl:"CLASS",c1:"Select country",c2:"Select region",c4:"Select school",c5:"Select class",bd:"BIRTHDAY",hd:"Hide",ht:"HEART",hA:"Available",hC:"Complicated",hL:"Locked",hP:"Private",sv:"Save",svd:"Saved!",ac:"Account security",aU:"New username",aC:"Current password",aN:"New password",up:"Update",chs:"Chats",nc:"+ New",slc:"Select a chat",mp:"Type a message...",nch:"No chats",pu:"Enter username:",np:"New announcement...",pb:"Publish",nn:"No news",bd2:"Grant/revoke news rights",gr:"Toggle rights",ed:"Edit",dl:"Delete",fl:"Follow",uf:"Unfollow",sm:"Message",hdn:"Hidden",rp:"Write a reply...",snd:"Send",fc:"Be first to comment",cn:"cancel",cd:"Really delete?",ep:"New text:",rpl:"Reply",nnt:"No notifications",l1:"liked your post",l2:"commented",l3:"sent a message",l4:"new announcement",cN:"Name",cT:"Title",cB:"Bio",addCeo:"Add new CEO",today:"Today",yesterday:"Yesterday",editedTag:"(edited)",editingMsg:"Editing message...",vS:"Search",srchPh:"Search users...",nosr:"No users found",noCard:"Card not set yet",supTitle:"Support",supEdit:"Edit",settings:"Settings",trophy:"Trophy Cabinet",noTr:"No certificates yet",univ:"Which university are you applying to?",univPh:"e.g. TATU, INHA, National University...",lang:"LANGUAGE",followers:"Followers",following:"Following",noFol:"No one here yet",myPosts:"Posts",noMyPosts:"No posts",verified:"Verified",addCert:"Grant certificate",certTitle:"Certificate title",certUser:"@username",certImg:"Attach image",certAdd:"Grant",closeX:"Close",support:"Support"},
+ru:{slogan:"Школьная соцсеть",tag:"Раскрась школу своими мыслями!",lg:"Войти",rg:"Регистрация",na:"Нет аккаунта?",ha:"Есть аккаунт?",un:"Имя пользователя",pw:"Пароль",fn:"Полное имя",uT:"Занято",uF:"Свободно",v1:"Chalking",v2:"Новости",v3:"Профиль",v4:"Чат",v5:"Уведомления",v6:"Язык",v7:"CEO",out:"Выйти",wh:"Что нового?!",md:"Фото",ef:"Постов нет. Будьте первым!",av:"Аватар",rl:"СТАТУС",st:"Ученик",tc:"Учитель",geo:"Регион и школа",ct:"СТРАНА",rgn:"ОБЛАСТЬ",sc:"ШКОЛА",kl:"КЛАСС",c1:"Выберите страну",c2:"Выберите область",c4:"Выберите школу",c5:"Выберите класс",bd:"ДЕНЬ РОЖДЕНИЯ",hd:"Скрыть",ht:"СЕРДЦЕ",hA:"Свободен(а)",hC:"Всё сложно",hL:"Занят(а)",hP:"Секрет",sv:"Сохранить",svd:"Сохранено!",ac:"Безопасность",aU:"Новый username",aC:"Текущий пароль",aN:"Новый пароль",up:"Обновить",chs:"Чаты",nc:"+ Новый",slc:"Выберите чат",mp:"Сообщение...",nch:"Чатов нет",pu:"Введите username:",np:"Новое объявление...",pb:"Опубликовать",nn:"Новостей нет",bd2:"Право на новости",gr:"Переключить право",ed:"Изменить",dl:"Удалить",fl:"Подписаться",uf:"Отписаться",sm:"Написать",hdn:"Скрыто",rp:"Ответ...",snd:"Отправить",cn:"отмена",fc:"Будьте первым",cd:"Точно удалить?",ep:"Новый текст:",rpl:"Ответить",nnt:"Уведомлений нет",l1:"понравился ваш пост",l2:"комментировал",l3:"отправил сообщение",l4:"новое объявление",cN:"Имя",cT:"Должность",cB:"Био",addCeo:"Добавить нового CEO",today:"Сегодня",yesterday:"Вчера",editedTag:"(изменено)",editingMsg:"Редактирование сообщения...",vS:"Поиск",srchPh:"Поиск пользователей...",nosr:"Никто не найден",noCard:"Карта ещё не указана",supTitle:"Поддержка",supEdit:"Изменить",settings:"Настройки",trophy:"Трофеи",noTr:"Сертификатов пока нет",univ:"В какой университет вы поступаете?",univPh:"напр. TATU, INHA, Национальный университет...",lang:"ЯЗЫК",followers:"Подписчики",following:"Подписки",noFol:"Пока никого нет",myPosts:"Посты",noMyPosts:"Постов нет",verified:"Подтверждено",addCert:"Выдать сертификат",certTitle:"Название сертификата",certUser:"@username",certImg:"Прикрепить фото",certAdd:"Выдать",closeX:"Закрыть",support:"Поддержка"}};
 function t(k){return (TR[LANG]&&TR[LANG][k])||TR.uz[k]||k}
 
 var HO='<svg class="w-5 h-5 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
@@ -420,7 +504,8 @@ function esc(s){var d=document.createElement("div");d.textContent=s||"";return d
 function ava(a){return a||"https://api.dicebear.com/7.x/thumbs/svg?seed=chalker"}
 function bdg(u,c){if(u==="boss")return " "+CK+CR;if(c===1)return " "+CK;return ""}
 function lm(h){return h.replace(/@([a-z0-9_.]+)/gi,function(m,u){return '<span class="mention" onclick="openProfile(\''+u.toLowerCase()+'\')">@'+u+'</span>'})}
-async function api(p,o){var r=await fetch(API+p,o);var d=await r.json();if(!r.ok)throw new Error(d.error||"Server error");return d}
+async function api(p,o){var r=await fetch(API+p,o);var d;try{d=await r.json()}catch(e){d={}}
+ if(!r.ok)throw new Error(d.error||d.detail||("Server error ("+r.status+")"));return d}
 function pj(o){return{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(o)}}
 function tEye(i,b){var n=$(i),x=$(b);if(n.type==="password"){n.type="text";x.innerHTML=EF}else{n.type="password";x.innerHTML=EY}}
 function chkU(inp,hint,ex){clearTimeout(uT);uT=setTimeout(async function(){
@@ -435,18 +520,17 @@ async function doLogin(){try{var f=new FormData();f.append("username",$("lU").va
 async function doRegister(){try{var f=new FormData();f.append("username",$("rU").value);f.append("fullname",$("rF").value);f.append("password",$("rP").value);
  var d=await api("/register",{method:"POST",body:f});setU(d.user);boot()}catch(e){alert(e.message)}}
 function setU(u){me=u;localStorage.setItem("chalker_user",JSON.stringify(u))}
-function logout(){localStorage.removeItem("chalker_user");me=null;clearInterval(pollT);clearInterval(ntT);hd("appView");sh("authView")}
+function logout(){localStorage.removeItem("chalker_user");me=null;curView=null;clearInterval(ntT);hd("appView");sh("authView")}
 
 var NI={
 feed:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#1d9bf0" stroke-width="1.8"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>',
 news:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#1d9bf0" stroke-width="1.8"><rect x="3" y="4" width="15" height="16" rx="2"/><path d="M18 8h3v10a2 2 0 0 1-2 2H5"/><path d="M7 8h7M7 12h7M7 16h4"/></svg>',
 profile:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#1d9bf0" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-6 8-6s6.5 2 8 6"/></svg>',
-chat:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#1d9bf0" stroke-width="1.8"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5z"/></svg>',
+search:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#1d9bf0" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>',
 notif:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#1d9bf0" stroke-width="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>',
-lang:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#1d9bf0" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>',
-ceo:'<svg class="nvic" viewBox="0 0 24 24" fill="#fbbf24"><path d="M2.5 7.5 7 11l5-7 5 7 4.5-3.5L19.5 19h-15L2.5 7.5z"/></svg>'};
+support:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#1d9bf0" stroke-width="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>'};
 function buildNav(){
- var it=[["feed",t("v1")],["news",t("v2")],["profile",t("v3")],["chat",t("v4")],["notif",t("v5")],["lang",t("v6")],["ceo",t("v7")]];
+ var it=[["feed",t("v1")],["news",t("v2")],["search",t("vS")],["notif",t("v5")],["profile",t("v3")]];
  var h="";
  for(var i=0;i<it.length;i++){
   var key=it[i][0],label=it[i][1];
@@ -456,7 +540,7 @@ function buildNav(){
  $("navBox").innerHTML=h;
  buildBottomNav()}
 function buildBottomNav(){
- var it=[["feed",t("v1")],["news",t("v2")],["profile",t("v3")],["chat",t("v4")],["notif",t("v5")],["lang",t("v6")],["ceo",t("v7")]];
+ var it=[["feed",t("v1")],["news",t("v2")],["search",t("vS")],["notif",t("v5")],["profile",t("v3")],["support",t("support")]];
  var h="";
  for(var i=0;i<it.length;i++){
   var key=it[i][0],label=it[i][1];
@@ -465,15 +549,22 @@ function buildBottomNav(){
  }
  $("bottomNavBox").innerHTML=h}
 function setActiveNav(n){
- ["feed","news","profile","chat","notif","lang","ceo"].forEach(function(v){
+ ["feed","news","search","notif","profile","support"].forEach(function(v){
   var el=$("navitem-"+v);if(el){if(v===n)el.classList.add("nvactive");else el.classList.remove("nvactive")}
   var bel=$("bnavitem-"+v);if(bel){if(v===n)bel.classList.add("nvactive");else bel.classList.remove("nvactive")}});
 }
+function toggleViews(n){
+ ["feed","news","profile","notif","search","support"].forEach(function(v){if(v===n)sh("view-"+v);else hd("view-"+v)});
+ if(n!=="feed"&&$("feedList"))$("feedList").innerHTML="";
+ if(n!=="profile"&&$("vpPosts"))$("vpPosts").innerHTML="";
+ setActiveNav(n)}
+var curView=null;
 function showView(n){
- ["feed","news","profile","chat","notif","lang","ceo"].forEach(function(v){if(v===n)sh("view-"+v);else hd("view-"+v)});
- setActiveNav(n);
- if(n==="feed")loadFeed();if(n==="news")loadNews();if(n==="profile")fillProfile();
- if(n==="chat")loadChatUsers();if(n==="notif")loadNotifs(true);if(n==="ceo")loadCeo()}
+ if(n===curView){toggleViews(n);return}
+ curView=n;toggleViews(n);
+ if(n==="feed")loadFeed();if(n==="news")loadNews();if(n==="profile"&&me)loadProfilePage(me.username,true);
+ if(n==="notif")loadNotifs(true);if(n==="search"){$("srchList").innerHTML="";$("srchInp").value="";$("srchInp").focus()}
+ if(n==="support")loadSupport()}
 /* FEED */
 async function loadFeed(){try{
  var ps=await api("/posts?user_id="+me.id);pCache={};
@@ -485,7 +576,7 @@ function lkH(p){return (p.my_status===1?HF:HO)+' '+p.likes_count}
 function rPost(p){
  var m="";
  if(p.media_base64&&p.media_type==="video")m='<video src="'+p.media_base64+'" controls preload="none" class="mt-2 rounded-2xl border brd max-h-96 w-full"></video>';
- else if(p.media_base64)m='<img src="'+p.media_base64+'" loading="lazy" class="mt-2 rounded-2xl border brd w-full max-h-96 object-contain bg-black/20">';
+ else if(p.media_base64)m='<img src="'+p.media_base64+'" loading="lazy" data-lb onclick="openLightbox(this.src)" class="mt-2 rounded-2xl border brd w-full max-h-96 object-contain bg-black/20">';
  var own=p.user_id===me.id?' <span class="text-xs text-gray-500"><span class="cursor-pointer hover:text-sky-500" onclick="edPost('+p.id+')">'+t("ed")+'</span> · <span class="cursor-pointer hover:text-red-400" onclick="dlPost('+p.id+')">'+t("dl")+'</span></span>':"";
  return '<div class="pc border-b brd p-3 sm:p-4 anim"><div class="flex gap-2.5 sm:gap-3">'+
  '<img src="'+ava(p.avatar_base64)+'" onclick="openProfile(\''+p.username+'\')" class="w-9 h-9 sm:w-11 sm:h-11 rounded-full object-cover cursor-pointer bg-neutral-800 shrink-0">'+
@@ -493,17 +584,19 @@ function rPost(p){
  '<span class="font-bold cursor-pointer hover:underline" onclick="openProfile(\''+p.username+'\')">'+esc(p.fullname)+bdg(p.username,p.can_post_news)+'</span>'+
  '<span class="text-gray-500 text-xs sm:text-sm">@'+p.username+'</span><span class="text-gray-600 text-[10px] sm:text-xs">'+(p.timestamp||"").slice(0,16).replace("T"," ")+'</span>'+own+'</div>'+
  '<p id="pt-'+p.id+'" class="mt-1 text-[14px] sm:text-[15px] whitespace-pre-wrap break-words">'+lm(esc(p.content))+'</p>'+m+
- '<div class="flex gap-6 sm:gap-8 mt-3 text-sm items-center">'+
- '<button id="lk-'+p.id+'" onclick="react('+p.id+')" class="'+(p.my_status===1?'text-pink-500':'text-gray-500')+' hover:text-pink-500">'+lkH(p)+'</button>'+
- '<button onclick="tglC('+p.id+')" class="text-gray-500 hover:text-sky-500">\u{1F4AC} '+p.comments_count+'</button></div>'+
+ '<div class="flex gap-3 mt-3 text-sm items-center">'+
+ '<button id="lk-'+p.id+'" onclick="react('+p.id+')" class="stk stk-like'+(p.my_status===1?' on':'')+'">'+lkH(p)+'</button>'+
+ '<button onclick="tglC('+p.id+')" class="stk stk-cm">\u{1F4AC} '+p.comments_count+'</button></div>'+
  '<div id="cm-'+p.id+'" class="hide mt-3 border-t brd pt-3"><div id="cl-'+p.id+'" class="space-y-3 mb-3"></div>'+
  '<div id="rh-'+p.id+'" class="hide text-xs text-sky-500 mb-1"></div><div class="flex gap-2">'+
  '<input id="ci-'+p.id+'" placeholder="'+t("rp")+'" onkeydown="if(event.key===\'Enter\')sendCmt('+p.id+')" class="flex-1 bg-neutral-900 border brd rounded-full px-4 py-2 text-sm">'+
  '<button onclick="sendCmt('+p.id+')" class="bb text-white text-sm font-bold rounded-full px-4">'+t("snd")+'</button></div></div></div></div></div>'}
+function openLightbox(src){var lb=$("lightbox");$("lbImg").src=src;lb.classList.remove("hide")}
+function closeLightbox(){$("lightbox").classList.add("hide");$("lbImg").src=""}
 async function react(id){try{
  var d=await api("/posts/like",pj({user_id:me.id,post_id:id,is_like:1}));var p=pCache[id];
  if(d.liked){p.my_status=1;p.likes_count++}else{p.my_status=null;p.likes_count--}
- var b=$("lk-"+id);b.innerHTML=lkH(p);b.className=(p.my_status===1?'text-pink-500':'text-gray-500')+' hover:text-pink-500'
+ var b=$("lk-"+id);b.innerHTML=lkH(p);b.className="stk stk-like"+(p.my_status===1?' on':'')
 }catch(e){alert(e.message)}}
 async function edPost(id){var n=prompt(t("ep"),pCache[id].content);if(n===null)return;
  try{await api("/posts/update",pj({user_id:me.id,post_id:id,content:n}));pCache[id].content=n;$("pt-"+id).innerHTML=lm(esc(n))}catch(e){alert(e.message)}}
@@ -514,11 +607,16 @@ function cmpImg(f,cb){var r=new FileReader();r.onload=function(e){var im=new Ima
   if(w>mx||h>mx){if(w>h){h=Math.round(h*mx/w);w=mx}else{w=Math.round(w*mx/h);h=mx}}
   var c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(im,0,0,w,h);cb(c.toDataURL("image/jpeg",.8))};
  im.src=e.target.result};r.readAsDataURL(f)}
+/* avatars get embedded (repeated) in every post/comment/follower row, so they must
+   stay tiny -- they're never shown bigger than ~48px in the UI anyway */
+function cmpAvatar(f,cb){var r=new FileReader();r.onload=function(e){var im=new Image();
+ im.onload=function(){var mx=200,w=im.width,h=im.height;
+  if(w>mx||h>mx){if(w>h){h=Math.round(h*mx/w);w=mx}else{w=Math.round(w*mx/h);h=mx}}
+  var c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(im,0,0,w,h);cb(c.toDataURL("image/jpeg",.7))};
+ im.src=e.target.result};r.readAsDataURL(f)}
 function pickMedia(inp){var f=inp.files[0];if(!f)return;
- if(f.type.indexOf("video")===0){
-  if(f.size>8*1024*1024){alert("Video max 8MB!");inp.value="";return}
-  var r=new FileReader();r.onload=function(e){mB64=e.target.result;mType="video";sh("mBox");$("mVid").src=mB64;sh("mVid");hd("mImg")};r.readAsDataURL(f)
- }else cmpImg(f,function(d){mB64=d;mType="image";sh("mBox");$("mImg").src=d;sh("mImg");hd("mVid")})}
+ if(f.type.indexOf("image")!==0){alert("Faqat rasm yuklash mumkin!");inp.value="";return}
+ cmpImg(f,function(d){mB64=d;mType="image";sh("mBox");$("mImg").src=d;sh("mImg");hd("mVid")})}
 function clrMedia(){mB64=null;mType=null;$("mInp").value="";hd("mBox");hd("mImg");hd("mVid")}
 async function createPost(){var c=$("pTxt").value.trim();if(!c&&!mB64)return;
  try{await api("/posts/create",pj({user_id:me.id,content:c,media_base64:mB64,media_type:mType}));
@@ -526,14 +624,16 @@ async function createPost(){var c=$("pTxt").value.trim();if(!c&&!mB64)return;
 
 /* COMMENTS */
 function tglC(id){var b=$("cm-"+id);if(b.classList.contains("hide")){b.classList.remove("hide");oC[id]=true;loadCmts(id)}else{b.classList.add("hide");oC[id]=false}}
-async function loadCmts(id){try{var l=await api("/comments?post_id="+id);
+async function loadCmts(id){try{var l=await api("/comments?post_id="+id+"&viewer_id="+me.id);
  function one(c,r){var canDel=(c.username===me.username||me.username==="boss");
   var delBtn=canDel?' · <span class="cursor-pointer text-gray-500 hover:text-red-400 font-semibold" onclick="delCmt('+id+','+c.id+')">'+t("dl")+'</span>':"";
   return '<div class="'+(r?'ml-5 sm:ml-8 border-l-2 border-neutral-800 pl-2 sm:pl-3':'')+'"><div class="flex gap-2">'+
   '<img src="'+ava(c.avatar_base64)+'" class="w-7 h-7 rounded-full object-cover bg-neutral-800 cursor-pointer" onclick="openProfile(\''+c.username+'\')">'+
   '<div class="flex-1 min-w-0"><span class="font-bold text-sm cursor-pointer hover:underline" onclick="openProfile(\''+c.username+'\')">'+esc(c.fullname)+bdg(c.username,c.can_post_news)+'</span>'+
   ' <span class="text-gray-500 text-xs">@'+c.username+'</span><p class="text-sm break-words">'+lm(esc(c.content))+'</p>'+
-  '<button onclick="setRep('+id+','+c.id+',\''+c.username+'\')" class="text-xs text-gray-500 hover:text-sky-500 font-semibold">'+t("rpl")+'</button>'+delBtn+'</div></div></div>'}
+  '<div class="flex items-center gap-2 mt-1">'+
+  '<button id="clk-'+c.id+'" onclick="cmtReact('+c.id+',false)" class="stk cstk stk-like'+(c.likes_count>0&&c.my_like?' on':'')+'">'+(c.my_like?HF:HO)+' '+(c.likes_count||0)+'</button>'+
+  '<button onclick="setRep('+id+','+c.id+',\''+c.username+'\')" class="text-xs text-gray-500 hover:text-sky-500 font-semibold">'+t("rpl")+'</button>'+delBtn+'</div></div></div></div>'}
  var h="";l.forEach(function(c){if(!c.parent_id){h+=one(c,false);l.forEach(function(r){if(r.parent_id===c.id)h+=one(r,true)})}});
  $("cl-"+id).innerHTML=h||'<p class="text-gray-600 text-xs">'+t("fc")+'</p>'}catch(e){alert(e.message)}}
 async function delCmt(postId,commentId){if(!confirm(t("cd")))return;
@@ -548,89 +648,38 @@ async function sendCmt(p){var i=$("ci-"+p),c=i.value.trim();if(!c)return;
  try{await api("/comments/create",pj({user_id:me.id,post_id:p,content:c,parent_id:rT[p]?rT[p].id:null}));
   i.value="";cnlRep(p);oC[p]=true;loadCmts(p)}catch(e){alert(e.message)}}
 
-/* PROFILE */
+/* PROFILE SETTINGS (own account only, opened via gear icon) */
+var UZ_REGIONS=GEO["O'zbekiston"];
 function fillSel(s,items,cur,ph){var h='<option value="">'+ph+'</option>';items.forEach(function(i){h+='<option value="'+i+'"'+(i===cur?' selected':'')+'>'+i+'</option>'});s.innerHTML=h}
-function onCt(){var c=$("pCt").value;fillSel($("pRg"),c&&GEO[c]?GEO[c]:[],"",t("c2"));fillSel($("pSc"),[],"",t("c4"));fillSel($("pKl"),[],"",t("c5"))}
 function onRg(){fillSel($("pSc"),$("pRg").value?schools():[],"",t("c4"));fillSel($("pKl"),[],"",t("c5"))}
 function onSc(){fillSel($("pKl"),classesFor($("pSc").value),"",t("c5"))}
-function fillProfile(){
+function openSettings(){
  $("pFn").value=me.fullname||"";$("pBio").value=me.bio||"";$("pBd").value=me.birth_date||"";
+ $("pUniv").value=me.university||"";
  $("pHB").checked=me.hide_birth_date===1;$("pHt").value=me.heart_status||"Available";
  $("pRole").value=me.role||"student";$("pAv").src=ava(me.avatar_base64);avB64=null;
- fillSel($("pCt"),Object.keys(GEO),me.country||"",t("c1"));
- fillSel($("pRg"),me.country&&GEO[me.country]?GEO[me.country]:[],me.region||"",t("c2"));
+ fillSel($("pRg"),UZ_REGIONS,me.region||"",t("c2"));
  fillSel($("pSc"),me.region?schools():[],me.school_name||"",t("c4"));
  fillSel($("pKl"),classesFor(me.school_name),me.school_class||"",t("c5"));
- $("aU").value="";$("aC").value="";$("aN").value=""}
-function pickAvatar(inp){var f=inp.files[0];if(!f)return;cmpImg(f,function(d){avB64=d;$("pAv").src=d})}
+ $("pLang").value=LANG;
+ $("aU").value="";$("aC").value="";$("aN").value="";sh("settingsModal")}
+function pickAvatar(inp){var f=inp.files[0];if(!f)return;cmpAvatar(f,function(d){avB64=d;$("pAv").src=d})}
 async function saveProfile(){try{
  var f=new FormData();f.append("user_id",me.id);f.append("fullname",$("pFn").value);
  f.append("school_class",$("pKl").value);f.append("school_name",$("pSc").value);
- f.append("country",$("pCt").value);f.append("region",$("pRg").value);f.append("district","");
+ f.append("country","O'zbekiston");f.append("region",$("pRg").value);f.append("district","");
  f.append("role",$("pRole").value);f.append("bio",$("pBio").value);f.append("birth_date",$("pBd").value);
  f.append("hide_birth_date",$("pHB").checked?1:0);f.append("heart_status",$("pHt").value);
- f.append("avatar_base64",avB64||"");
- var d=await api("/profile/update",{method:"POST",body:f});setU(d.user);renderSide();alert(t("svd"))}catch(e){alert(e.message)}}
+ f.append("avatar_base64",avB64||"");f.append("university",$("pUniv").value);
+ var d=await api("/profile/update",{method:"POST",body:f});setU(d.user);renderSide();alert(t("svd"));
+ if($("view-profile").classList.contains("hide")===false)loadProfilePage(me.username,true)}catch(e){alert(e.message)}}
 async function saveAccount(){try{
  var f=new FormData();f.append("user_id",me.id);f.append("current_password",$("aC").value);
  f.append("new_username",$("aU").value);f.append("new_password",$("aN").value);
- var d=await api("/account/update",{method:"POST",body:f});setU(d.user);renderSide();fillProfile();alert(t("svd"))}catch(e){alert(e.message)}}
+ var d=await api("/account/update",{method:"POST",body:f});setU(d.user);renderSide();alert(t("svd"))}catch(e){alert(e.message)}}
+function changeLang(l){LANG=l;localStorage.setItem("chalker_lang",l);applyLang();buildNav();
+ if(!$("view-profile").classList.contains("hide"))loadProfilePage(mUser?mUser.username:me.username,!mUser||mUser.username===me.username)}
 
-/* CHAT */
-async function loadChatUsers(){try{
- var us=await api("/chat/active_users?user_id="+me.id);
- if(!us.length){$("chatUsers").innerHTML='<p class="text-center text-gray-600 text-xs p-4">'+t("nch")+'</p>';return}
- var h="";us.forEach(function(u){
-  var badge=(u.unread_count>0)?'<span class="ml-auto shrink-0 bg-sky-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">'+u.unread_count+'</span>':"";
-  h+='<div onclick="openChat(\''+u.username+'\')" class="flex items-center gap-2 p-3 hover:bg-neutral-900 cursor-pointer '+(partner===u.username?'bg-sky-500/10':'')+'">'+
-  '<img src="'+ava(u.avatar_base64)+'" class="w-10 h-10 rounded-full object-cover bg-neutral-800 shrink-0">'+
-  '<div class="min-w-0 flex-1 hidden sm:block"><p class="text-xs font-bold truncate">'+esc(u.fullname)+bdg(u.username,u.can_post_news)+'</p>'+
-  '<p class="text-xs text-gray-500 truncate">'+esc(u.last_message||"@"+u.username)+'</p></div>'+badge+'</div>'});
- $("chatUsers").innerHTML=h}catch(e){alert(e.message)}}
-function newChat(){var u=prompt(t("pu"));if(u)openChat(u.trim().toLowerCase().replace(/^@/,""))}
-async function openChat(u){partner=u;sh("chBar");hd("chEditBar");editingMsgId=null;await loadHist(true)}
-function dayLabel(ts){
- var d=new Date((ts||"").replace(" ","T")+"Z"),now=new Date();
- var sameDay=function(a,b){return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate()};
- var yest=new Date(now);yest.setDate(now.getDate()-1);
- if(sameDay(d,now))return t("today");
- if(sameDay(d,yest))return t("yesterday");
- return d.toLocaleDateString()}
-async function loadHist(fs){if(!partner)return;try{
- var d=await api("/chat/history?user_id="+me.id+"&partner_username="+encodeURIComponent(partner));
- $("chHead").innerHTML='<div class="flex items-center gap-2 cursor-pointer" onclick="openProfile(\''+d.partner.username+'\')">'+
- '<img src="'+ava(d.partner.avatar_base64)+'" class="w-8 h-8 rounded-full object-cover bg-neutral-800">'+
- '<div><p class="font-bold text-white text-sm">'+esc(d.partner.fullname)+bdg(d.partner.username,d.partner.can_post_news)+'</p>'+
- '<p class="text-xs text-sky-500">@'+d.partner.username+'</p></div></div>';
- var b=$("chMsgs"),ab=b.scrollHeight-b.scrollTop-b.clientHeight<60,h="",lastDay="",lastSender=null;
- d.messages.forEach(function(m){var mn=m.sender_id===me.id;
-  var dl=dayLabel(m.timestamp);
-  if(dl!==lastDay){h+='<div class="flex justify-center my-3"><span class="text-[10px] font-bold text-gray-400 bg-neutral-900 border brd rounded-full px-3 py-1">'+dl+'</span></div>';lastDay=dl;lastSender=null}
-  var grouped=(lastSender===m.sender_id);lastSender=m.sender_id;
-  var img=m.image_base64?'<img src="'+m.image_base64+'" class="rounded-xl mb-1 max-w-full max-h-64 object-cover">':"";
-  var editedTag=m.edited?' <span class="opacity-60 italic">'+t("editedTag")+'</span>':"";
-  var ticks=mn?(' <span class="'+(m.is_read?'text-sky-300':'opacity-60')+'">'+(m.is_read?'\u2713\u2713':'\u2713')+'</span>'):"";
-  var ownBtns=mn?'<div class="flex gap-2.5 justify-end mt-0.5 text-[10px] text-gray-500">'+
-   '<span class="cursor-pointer hover:text-sky-400 active:text-sky-300" onclick="startEditMsg('+m.id+',\''+esc(m.message).replace(/'/g,"\\'")+'\')">'+t("ed")+'</span>'+
-   '<span class="cursor-pointer hover:text-red-400 active:text-red-300" onclick="delMsg('+m.id+')">'+t("dl")+'</span></div>':"";
-  h+='<div class="flex '+(mn?'justify-end':'justify-start')+' '+(grouped?'mt-0.5':'mt-2.5')+'">'+
-  '<div class="max-w-[78%] sm:max-w-[72%]">'+
-  '<div class="px-3.5 py-2 text-[14px] sm:text-sm break-words rounded-2xl '+(mn?'bb text-white '+(grouped?'rounded-br-md':'rounded-br-md'):'bg-neutral-800 '+(grouped?'rounded-bl-md':'rounded-bl-md'))+'">'+
-  img+(m.message?esc(m.message):'')+editedTag+
-  '<span class="text-[10px] opacity-60 ml-2 whitespace-nowrap">'+(m.timestamp||"").slice(11,16)+'</span>'+ticks+'</div>'+ownBtns+'</div></div>'});
- b.innerHTML=h;if(fs||ab)b.scrollTop=b.scrollHeight;loadChatUsers()}catch(e){alert(e.message);partner=null}}
-var editingMsgId=null;
-function startEditMsg(id,txt){editingMsgId=id;var i=$("chInp");i.value=txt;i.focus();
- i.setSelectionRange(i.value.length,i.value.length);sh("chEditBar")}
-function cancelEditMsg(){editingMsgId=null;$("chInp").value="";hd("chEditBar")}
-async function delMsg(id){if(!confirm(t("cd")))return;
- try{await api("/chat/delete",pj({user_id:me.id,message_id:id}));loadHist(false)}catch(e){alert(e.message)}}
-async function sendMsg(){var i=$("chInp"),m=i.value.trim();if(!m||!partner)return;
- try{
-  if(editingMsgId){await api("/chat/edit",pj({user_id:me.id,message_id:editingMsgId,message:m}));cancelEditMsg()}
-  else{await api("/chat/send",pj({sender_id:me.id,receiver_username:partner,message:m}))}
-  i.value="";loadHist(true)
- }catch(e){alert(e.message)}}
 /* NEWS */
 function nlkH(n){return (n.my_like?HF:HO)+' '+n.likes_count}
 async function loadNews(){try{
@@ -645,9 +694,9 @@ async function loadNews(){try{
   (n.author?'<span class="mention" onclick="openProfile(\''+n.author+'\')">@'+n.author+'</span>':'')+
   '<span class="text-gray-600 text-[10px] sm:text-xs">'+(n.timestamp||"").slice(0,16).replace("T"," ")+'</span>'+own+'</div>'+
   '<p id="nt-'+n.id+'" class="mt-1 text-[14px] sm:text-[15px] whitespace-pre-wrap break-words">'+lm(esc(n.title))+'</p>'+
-  '<div class="flex gap-6 sm:gap-8 mt-3 text-sm items-center">'+
-  '<button id="nlk-'+n.id+'" onclick="nReact('+n.id+')" class="'+(n.my_like?'text-pink-500':'text-gray-500')+' hover:text-pink-500">'+nlkH(n)+'</button>'+
-  '<button onclick="tglNC('+n.id+')" class="text-gray-500 hover:text-sky-500">\u{1F4AC} '+n.comments_count+'</button></div>'+
+  '<div class="flex gap-3 mt-3 text-sm items-center">'+
+  '<button id="nlk-'+n.id+'" onclick="nReact('+n.id+')" class="stk stk-like'+(n.my_like?' on':'')+'">'+nlkH(n)+'</button>'+
+  '<button onclick="tglNC('+n.id+')" class="stk stk-cm">\u{1F4AC} '+n.comments_count+'</button></div>'+
   '<div id="ncm-'+n.id+'" class="hide mt-3 border-t brd pt-3"><div id="ncl-'+n.id+'" class="space-y-3 mb-3"></div><div class="flex gap-2">'+
   '<input id="nci-'+n.id+'" placeholder="'+t("rp")+'" onkeydown="if(event.key===\'Enter\')sendNCmt('+n.id+')" class="flex-1 bg-neutral-900 border brd rounded-full px-4 py-2 text-sm">'+
   '<button onclick="sendNCmt('+n.id+')" class="bb text-white text-sm font-bold rounded-full px-4">'+t("snd")+'</button></div></div></div>'});
@@ -657,15 +706,23 @@ async function loadNews(){try{
 async function nReact(id){try{
  var d=await api("/news/like",pj({user_id:me.id,news_id:id}));var n=nCache[id];
  if(d.liked){n.my_like=1;n.likes_count++}else{n.my_like=null;n.likes_count--}
- var b=$("nlk-"+id);b.innerHTML=nlkH(n);b.className=(n.my_like?'text-pink-500':'text-gray-500')+' hover:text-pink-500'}catch(e){alert(e.message)}}
+ var b=$("nlk-"+id);b.innerHTML=nlkH(n);b.className="stk stk-like"+(n.my_like?' on':'')}catch(e){alert(e.message)}}
 function tglNC(id){var b=$("ncm-"+id);if(b.classList.contains("hide")){b.classList.remove("hide");oNC[id]=true;loadNCmts(id)}else{b.classList.add("hide");oNC[id]=false}}
-async function loadNCmts(id){try{var l=await api("/news/comments?news_id="+id);var h="";
+async function loadNCmts(id){try{var l=await api("/news/comments?news_id="+id+"&viewer_id="+me.id);var h="";
  l.forEach(function(c){var canDel=(c.username===me.username||me.username==="boss");
   var delBtn=canDel?' <span class="cursor-pointer text-gray-500 hover:text-red-400 font-semibold" onclick="delNCmt('+id+','+c.id+')">'+t("dl")+'</span>':"";
   h+='<div class="flex gap-2"><img src="'+ava(c.avatar_base64)+'" class="w-7 h-7 rounded-full object-cover bg-neutral-800 cursor-pointer" onclick="openProfile(\''+c.username+'\')">'+
   '<div class="flex-1 min-w-0"><span class="font-bold text-sm cursor-pointer hover:underline" onclick="openProfile(\''+c.username+'\')">'+esc(c.fullname)+bdg(c.username,c.can_post_news)+'</span>'+
-  ' <span class="text-gray-500 text-xs">@'+c.username+'</span><p class="text-sm break-words">'+lm(esc(c.content))+delBtn+'</p></div></div>'});
+  ' <span class="text-gray-500 text-xs">@'+c.username+'</span><p class="text-sm break-words">'+lm(esc(c.content))+'</p>'+
+  '<div class="flex items-center gap-2 mt-1"><button id="nclk-'+c.id+'" onclick="cmtReact('+c.id+',true)" class="stk cstk stk-like'+(c.my_like?' on':'')+'">'+(c.my_like?HF:HO)+' '+(c.likes_count||0)+'</button>'+delBtn+'</div></div></div>'});
  $("ncl-"+id).innerHTML=h||'<p class="text-gray-600 text-xs">'+t("fc")+'</p>'}catch(e){alert(e.message)}}
+async function cmtReact(id,isNews){try{
+ var ep=isNews?"/news/comments/like":"/comments/like";
+ var d=await api(ep,pj({user_id:me.id,comment_id:id}));
+ var b=$((isNews?"nclk-":"clk-")+id);
+ b.innerHTML=(d.liked?HF:HO)+' '+d.count;
+ b.className="stk cstk stk-like"+(d.liked?' on':'')
+}catch(e){alert(e.message)}}
 async function delNCmt(newsId,commentId){if(!confirm(t("cd")))return;
  try{await api("/news/comments/delete",pj({user_id:me.id,comment_id:commentId}));
   if(nCache[newsId]&&nCache[newsId].comments_count>0){nCache[newsId].comments_count--;
@@ -683,6 +740,61 @@ async function dlNews(id){if(!confirm(t("cd")))return;
 async function grantNews(){var u=$("gU").value.trim();if(!u)return;
  try{var d=await api("/admin/news_rights",pj({boss_id:me.id,target_username:u}));
   alert("@"+u.replace(/^@/,"")+(d.granted?" \u2713":" \u2717"));$("gU").value=""}catch(e){alert(e.message)}}
+
+/* SEARCH */
+var srchT=null;
+function doSearch(){
+ clearTimeout(srchT);
+ var q=$("srchInp").value.trim();
+ if(!q){$("srchList").innerHTML="";return}
+ srchT=setTimeout(async function(){
+  try{
+   var res=await api("/search?q="+encodeURIComponent(q)+"&viewer_id="+me.id);
+   if(!res.length){$("srchList").innerHTML='<p class="text-center text-gray-600 p-10">'+t("nosr")+'</p>';return}
+   var h="";
+   res.forEach(function(u){
+    h+='<div class="flex items-center gap-3 p-3 rounded-2xl hover:bg-neutral-900">'+
+    '<img src="'+ava(u.avatar_base64)+'" onclick="openProfile(\''+u.username+'\')" class="w-11 h-11 rounded-full object-cover bg-neutral-800 cursor-pointer shrink-0">'+
+    '<div class="flex-1 min-w-0 cursor-pointer" onclick="openProfile(\''+u.username+'\')">'+
+    '<p class="text-sm font-bold truncate">'+esc(u.fullname||u.username)+bdg(u.username,u.can_post_news)+'</p>'+
+    '<p class="text-xs text-gray-500 truncate">@'+u.username+(u.school_name?' · '+esc(u.school_name):'')+'</p></div>'+
+    '<button onclick="srchFollow(\''+u.username+'\',this)" class="shrink-0 '+(u.is_following?'border brd font-bold':'bb text-white font-bold')+' rounded-full px-4 py-1.5 text-xs">'+(u.is_following?t("uf"):t("fl"))+'</button></div>'
+   });
+   $("srchList").innerHTML=h;
+  }catch(e){alert(e.message)}
+ },300)}
+async function srchFollow(u,btn){
+ try{
+  var d=await api("/users/follow",pj({follower_id:me.id,following_username:u}));
+  if(d.following){btn.textContent=t("uf");btn.className="shrink-0 border brd font-bold rounded-full px-4 py-1.5 text-xs"}
+  else{btn.textContent=t("fl");btn.className="shrink-0 bb text-white font-bold rounded-full px-4 py-1.5 text-xs"}
+ }catch(e){alert(e.message)}}
+
+/* SUPPORT (synced between desktop aside and mobile support view) */
+async function loadSupport(){try{
+ var d=await api("/support");
+ var masked=d.card_number?d.card_number:t("noCard");
+ var html='<p class="text-xs text-gray-500 font-bold">'+esc(d.card_type||"Humo")+'</p>'+
+  '<p class="text-lg font-mono font-bold tracking-wider">'+esc(masked)+'</p>'+
+  (d.card_holder?'<p class="text-xs text-gray-400">'+esc(d.card_holder)+'</p>':'');
+ $("supportShow").innerHTML=html;if($("supportShowM"))$("supportShowM").innerHTML=html;
+ if($("tSupportM"))$("tSupportM").textContent=t("supTitle");
+ if($("tSupSaveM"))$("tSupSaveM").textContent=t("sv");
+ if(me.username==="boss"){
+  sh("supEditBtn");$("supEditBtn").textContent=t("supEdit");
+  $("scType").value=d.card_type||"Humo";$("scNumber").value=d.card_number||"";$("scHolder").value=d.card_holder||"";
+  if($("supEditBtnM")){sh("supEditBtnM");$("supEditBtnM").textContent=t("supEdit");$("scTypeM").value=d.card_type||"Humo";$("scNumberM").value=d.card_number||"";$("scHolderM").value=d.card_holder||""}
+ }else{hd("supEditBtn");hd("supportEditWrap");if($("supEditBtnM")){hd("supEditBtnM");hd("supportEditWrapM")}}
+}catch(e){}}
+function toggleSupportEdit(){$("supportEditWrap").classList.toggle("hide");if($("supportEditWrapM"))$("supportEditWrapM").classList.toggle("hide")}
+async function saveSupport(){
+ try{
+  var ty=($("scTypeM")&&!$("supportEditWrapM").classList.contains("hide"))?$("scTypeM").value:$("scType").value;
+  var nu=($("scNumberM")&&!$("supportEditWrapM").classList.contains("hide"))?$("scNumberM").value.trim():$("scNumber").value.trim();
+  var ho=($("scHolderM")&&!$("supportEditWrapM").classList.contains("hide"))?$("scHolderM").value.trim():$("scHolder").value.trim();
+  await api("/support/update",pj({user_id:me.id,card_type:ty,card_number:nu,card_holder:ho}));
+  hd("supportEditWrap");if($("supportEditWrapM"))hd("supportEditWrapM");loadSupport();alert(t("svd"))
+ }catch(e){alert(e.message)}}
 
 /* NOTIFICATIONS */
 async function loadNotifs(mark){try{
@@ -703,79 +815,70 @@ function updDot(ns){
  var el=$("nDot");if(el){if(show)el.classList.remove("hide");else el.classList.add("hide")}
  var elB=$("nDotB");if(elB){if(show)elB.classList.remove("hide");else elB.classList.add("hide")}}
 
-/* CEO */
-async function loadCeo(){try{var d=await api("/ceo");
- $("cNm").textContent=d.name;$("cTt").textContent=d.title;$("cBi").textContent=d.bio;
- var ini="";d.name.split(" ").forEach(function(w){if(w)ini+=w[0]});$("ceoIn").textContent=ini.slice(0,2).toUpperCase();
- var tg=d.telegram.replace(/^@/,""),ig=d.instagram.replace(/^@/,""),ch=d.chalker.replace(/^@/,"");
- $("cLk").innerHTML='<a href="https://t.me/'+tg+'" target="_blank" class="border brd rounded-full px-5 py-2 font-bold hover:bg-neutral-900 w-56">Telegram · @'+tg+'</a>'+
- '<a href="https://instagram.com/'+ig+'" target="_blank" class="border brd rounded-full px-5 py-2 font-bold hover:bg-neutral-900 w-56">Instagram · @'+ig+'</a>'+
- '<span onclick="openProfile(\''+ch+'\')" class="border brd rounded-full px-5 py-2 font-bold hover:bg-neutral-900 w-56 cursor-pointer text-sky-500">Chalker · @'+ch+'</span>';
- if(me.username==="boss"){sh("ceoEB");$("fNm").value=d.name;$("fTt").value=d.title;$("fBi").value=d.bio;
-  $("fTg").value=d.telegram;$("fIg").value=d.instagram;$("fCh").value=d.chalker;sh("ceoAddWrap")}
- else{hd("ceoEB");$("ceoForm").classList.add("hide");$("ceoShow").classList.remove("hide");hd("ceoAddWrap");hd("ceoAddForm")}
- loadExtraCeos()
-}catch(e){alert(e.message)}}
-async function loadExtraCeos(){try{
- var list=await api("/ceo/list");ceoExtraCache={};
- if(!list||!list.length){$("ceoExtra").innerHTML="";return}
- var isBoss=(me.username==="boss"),h="";
- list.forEach(function(d){ceoExtraCache[d.id]=d;
-  var ini="";(d.name||"").split(" ").forEach(function(w){if(w)ini+=w[0]});ini=ini.slice(0,2).toUpperCase();
-  var tg=(d.telegram||"").replace(/^@/,""),ig=(d.instagram||"").replace(/^@/,""),ch=(d.chalker||"").replace(/^@/,"");
-  var ownRow=isBoss?'<div class="flex justify-end gap-3 text-xs text-gray-500 mb-1"><span class="cursor-pointer hover:text-sky-500 font-semibold" onclick="editCeoExtra('+d.id+')">'+t("ed")+'</span><span class="cursor-pointer hover:text-red-400 font-semibold" onclick="delCeoExtra('+d.id+')">'+t("dl")+'</span></div>':"";
-  h+='<div class="border brd rounded-2xl p-5 text-center anim">'+ownRow+
-  '<div class="w-16 h-16 mx-auto rounded-full bb flex items-center justify-center text-xl font-extrabold text-white mb-3">'+ini+'</div>'+
-  '<h4 class="text-lg font-extrabold">'+esc(d.name)+'</h4><p class="text-sky-500 font-semibold text-sm mt-0.5">'+esc(d.title)+'</p>'+
-  (d.bio?'<p class="text-gray-400 text-xs mt-3">'+esc(d.bio)+'</p>':'')+
-  '<div class="flex flex-col items-center gap-2 mt-4 text-xs">'+
-  (tg?'<a href="https://t.me/'+tg+'" target="_blank" class="border brd rounded-full px-4 py-1.5 font-bold hover:bg-neutral-900 w-48">Telegram · @'+tg+'</a>':'')+
-  (ig?'<a href="https://instagram.com/'+ig+'" target="_blank" class="border brd rounded-full px-4 py-1.5 font-bold hover:bg-neutral-900 w-48">Instagram · @'+ig+'</a>':'')+
-  (ch?'<span onclick="openProfile(\''+ch+'\')" class="border brd rounded-full px-4 py-1.5 font-bold hover:bg-neutral-900 w-48 cursor-pointer text-sky-500">Chalker · @'+ch+'</span>':'')+
-  '</div></div>'});
- $("ceoExtra").innerHTML=h
-}catch(e){$("ceoExtra").innerHTML=""}}
-function clearCeoAddFields(){$("acNm").value="";$("acTt").value="";$("acBi").value="";$("acTg").value="";$("acIg").value="";$("acCh").value=""}
-function toggleCeoAddForm(){ceoEditId=null;clearCeoAddFields();$("tAddCeo").textContent=t("addCeo");
- $("ceoAddForm").classList.remove("hide");$("ceoAddForm").scrollIntoView({behavior:"smooth",block:"nearest"})}
-function editCeoExtra(id){var d=ceoExtraCache[id];if(!d)return;ceoEditId=id;
- $("acNm").value=d.name||"";$("acTt").value=d.title||"";$("acBi").value=d.bio||"";
- $("acTg").value=d.telegram||"";$("acIg").value=d.instagram||"";$("acCh").value=d.chalker||"";
- $("tAddCeo").textContent=t("ed");$("ceoAddForm").classList.remove("hide");
- $("ceoAddForm").scrollIntoView({behavior:"smooth",block:"nearest"})}
-async function delCeoExtra(id){if(!confirm(t("cd")))return;
- try{await api("/ceo/extra/delete",pj({user_id:me.id,ceo_id:id}));loadExtraCeos()}catch(e){alert(e.message)}}
-async function addCeo(){var nm=$("acNm").value.trim();if(!nm)return;
- try{
-  if(ceoEditId){
-   await api("/ceo/extra/update",pj({user_id:me.id,ceo_id:ceoEditId,name:nm,title:$("acTt").value,bio:$("acBi").value,
-   telegram:$("acTg").value,instagram:$("acIg").value,chalker:$("acCh").value}));
-  }else{
-   await api("/ceo/create",pj({user_id:me.id,name:nm,title:$("acTt").value,bio:$("acBi").value,
-   telegram:$("acTg").value,instagram:$("acIg").value,chalker:$("acCh").value}));
-  }
-  ceoEditId=null;clearCeoAddFields();$("ceoAddForm").classList.add("hide");loadExtraCeos();alert(t("svd"))
- }catch(e){alert(e.message)}}
-function tCeoEdit(){$("ceoShow").classList.toggle("hide");$("ceoForm").classList.toggle("hide")}
-async function saveCeo(){try{
- await api("/ceo/update",pj({user_id:me.id,name:$("fNm").value,title:$("fTt").value,bio:$("fBi").value,
- telegram:$("fTg").value,instagram:$("fIg").value,chalker:$("fCh").value}));tCeoEdit();loadCeo();alert(t("svd"))}catch(e){alert(e.message)}}
-
-/* MODAL */
-async function openProfile(u){try{
+/* PROFILE PAGE (own or someone else's) */
+function openProfile(u){if(!me)return;toggleViews("profile");loadProfilePage(u,u===me.username)}
+async function loadProfilePage(u,isSelf){try{
  var d=await api("/users/"+encodeURIComponent(u)+"?viewer_id="+me.id);mUser=d;
- $("mAv").src=ava(d.avatar_base64);$("mFn").innerHTML=esc(d.fullname||d.username)+bdg(d.username,d.can_post_news);
- $("mUn").textContent="@"+d.username;$("mRl").textContent=d.role==="teacher"?t("tc"):t("st");
- $("mFw").textContent=d.followers;$("mFg").textContent=d.following;
- var rg=[];if(d.country)rg.push(d.country);if(d.region)rg.push(d.region);if(d.school_name)rg.push(d.school_name);
- $("mRg").textContent=rg.join(", ")||"—";$("mKl").textContent=d.school_class||"—";
- $("mBd").textContent=d.birth_date||t("hdn");$("mHt").textContent=t("h"+(d.heart_status||"Available").charAt(0));
- $("mBi").textContent=d.bio?'"'+d.bio+'"':"";
- $("mFB").textContent=d.is_following?t("uf"):t("fl");
- if(d.id===me.id)hd("mAct");else sh("mAct");sh("pModal")}catch(e){alert(e.message)}}
-function closeModal(){hd("pModal")}
-async function tglFollow(){try{await api("/users/follow",pj({follower_id:me.id,following_username:mUser.username}));openProfile(mUser.username)}catch(e){alert(e.message)}}
-function dmModal(){closeModal();showView("chat");openChat(mUser.username)}
+ $("vpAv").src=ava(d.avatar_base64);
+ $("vpName").innerHTML=esc(d.fullname||d.username)+bdg(d.username,d.can_post_news);
+ $("vpUn").textContent="@"+d.username;
+ $("vpRole").textContent=d.role==="teacher"?t("tc"):t("st");
+ $("vpHeart").textContent="  \u2764\uFE0F "+t("h"+(d.heart_status||"Available").charAt(0));
+ var meta=[];if(d.region)meta.push(d.region);if(d.school_name)meta.push(d.school_name);if(d.school_class)meta.push(d.school_class);
+ $("vpMeta").textContent=meta.join(" · ");
+ $("vpBio").textContent=d.bio?'"'+d.bio+'"':"";
+ $("vpUniv").textContent=d.university?"\u{1F393} "+d.university:"";
+ $("vpFw").textContent=d.followers;$("vpFg").textContent=d.following;
+ $("tFwLbl").textContent=t("followers");$("tFgLbl").textContent=t("following");
+ $("tTrophy").textContent="\u{1F3C6} "+t("trophy");$("tMyPosts").textContent=t("myPosts");
+ if(isSelf){sh("vpGear");hd("vpFollowBtn");sh("addCertBtn")}
+ else{hd("vpGear");sh("vpFollowBtn");hd("addCertBtn");hd("certFormBox");$("vpFollowBtn").textContent=d.is_following?t("uf"):t("fl");
+  $("vpFollowBtn").className="bb text-white font-bold rounded-full px-5 py-2 text-sm"+(d.is_following?" border brd":"")}
+ loadTrophy(d.username,isSelf);loadUserPosts(d.username)
+}catch(e){alert(e.message)}}
+async function tglFollowVP(){try{await api("/users/follow",pj({follower_id:me.id,following_username:mUser.username}));loadProfilePage(mUser.username,false)}catch(e){alert(e.message)}}
+function toggleCertForm(){$("certFormBox").classList.toggle("hide")}
+var ctB64=null;
+function pickCertImg(inp){var f=inp.files[0];if(!f)return;cmpImg(f,function(d){ctB64=d})}
+async function addOwnCert(){var ti=$("ctTitle").value.trim();if(!ti)return;
+ try{await api("/certificates/self_create",pj({user_id:me.id,title:ti,image_base64:ctB64}));
+  $("ctTitle").value="";$("ctImg").value="";ctB64=null;hd("certFormBox");loadTrophy(me.username,true)}catch(e){alert(e.message)}}
+async function loadTrophy(u,isSelf){try{
+ var certs=await api("/certificates?username="+encodeURIComponent(u));certCache={};
+ if(!certs.length){$("trophyGrid").innerHTML="";sh("noTrMsg");$("noTrMsg").textContent=t("noTr");return}
+ hd("noTrMsg");var h="";
+ certs.forEach(function(c){certCache[c.id]=c;
+  var delX=isSelf?'<div class="tdel" onclick="event.stopPropagation();delOwnCert('+c.id+')">\u2715</div>':"";
+  h+='<div class="trophyCard" onclick="openCert('+c.id+','+(isSelf?"true":"false")+')">'+delX+
+  (c.image_base64?'<img src="'+c.image_base64+'">':'<div class="w-full h-[68%] flex items-center justify-center text-3xl">\u{1F3C6}</div>')+
+  '<svg class="tvb" viewBox="0 0 24 24" fill="#1d9bf0"><path d="M22.25 12c0-1.43-.88-2.67-2.19-3.34.46-1.39.2-2.9-.81-3.91s-2.52-1.27-3.91-.81c-.66-1.31-1.91-2.19-3.34-2.19s-2.67.88-3.33 2.19c-1.4-.46-2.91-.2-3.92.81s-1.26 2.52-.8 3.91c-1.31.67-2.2 1.91-2.2 3.34s.89 2.67 2.2 3.34c-.46 1.39-.21 2.9.8 3.91s2.52 1.26 3.91.81c.67 1.31 1.91 2.19 3.34 2.19s2.68-.88 3.34-2.19c1.39.45 2.9.2 3.91-.81s1.27-2.52.81-3.91c1.31-.67 2.19-1.91 2.19-3.34zm-11.71 4.2L6.8 12.46l1.41-1.42 2.26 2.26 4.8-5.23 1.47 1.36-6.2 6.77z"/></svg>'+
+  '<div class="tcap">'+esc(c.title)+'</div></div>'});
+ $("trophyGrid").innerHTML=h}catch(e){}}
+function openCert(id,isSelf){var c=certCache[id];if(!c)return;
+ $("certBigImg").src=c.image_base64||"";$("certBigImg").className=c.image_base64?"":"hide";
+ $("certBigTitle").textContent=c.title;$("tVerified").textContent=t("verified");
+ var delBtn=$("certDelBtn");
+ if(isSelf){delBtn.classList.remove("hide");delBtn.onclick=function(){delOwnCert(id)}}else{delBtn.classList.add("hide")}
+ sh("certModal")}
+async function delOwnCert(id){if(!confirm(t("cd")))return;
+ try{await api("/certificates/self_delete",pj({user_id:me.id,cert_id:id}));hd("certModal");loadTrophy(me.username,true)}catch(e){alert(e.message)}}
+async function loadUserPosts(u){try{
+ var ps=await api("/posts?user_id="+me.id+"&author="+encodeURIComponent(u));
+ if(!ps.length){$("vpPosts").innerHTML='<p class="text-center text-gray-600 p-6 text-sm">'+t("noMyPosts")+'</p>';return}
+ var h="";ps.forEach(function(p){pCache[p.id]=p;h+=rPost(p)});$("vpPosts").innerHTML=h}catch(e){}}
+async function openFollowList(kind){try{
+ $("tFollowModal").textContent=kind==="followers"?t("followers"):t("following");sh("followModal");
+ $("followListBox").innerHTML='<p class="text-center text-gray-600 p-6 text-sm">...</p>';
+ var list=await api("/users/"+encodeURIComponent(mUser.username)+"/"+kind+"?viewer_id="+me.id);
+ if(!list.length){$("followListBox").innerHTML='<p class="text-center text-gray-600 p-6 text-sm">'+t("noFol")+'</p>';return}
+ var h="";list.forEach(function(u){
+  h+='<div class="flex items-center gap-3 p-2.5 rounded-2xl hover:bg-neutral-900">'+
+  '<img src="'+ava(u.avatar_base64)+'" onclick="hd(\'followModal\');openProfile(\''+u.username+'\')" class="w-10 h-10 rounded-full object-cover bg-neutral-800 cursor-pointer shrink-0">'+
+  '<div class="flex-1 min-w-0 cursor-pointer" onclick="hd(\'followModal\');openProfile(\''+u.username+'\')">'+
+  '<p class="text-sm font-bold truncate">'+esc(u.fullname||u.username)+bdg(u.username,u.can_post_news)+'</p>'+
+  '<p class="text-xs text-gray-500 truncate">@'+u.username+'</p></div>'+
+  (u.id!==me.id?'<button onclick="srchFollow(\''+u.username+'\',this)" class="shrink-0 '+(u.is_following?'border brd font-bold':'bb text-white font-bold')+' rounded-full px-3 py-1.5 text-xs">'+(u.is_following?t("uf"):t("fl"))+'</button>':'')+'</div>'});
+ $("followListBox").innerHTML=h}catch(e){alert(e.message)}}
 
 /* BOOT */
 function applyLang(){
@@ -785,27 +888,20 @@ function applyLang(){
  $("tLB").textContent=t("lg");$("tRB").textContent=t("rg");$("tNA").textContent=t("na");$("tGR").textContent=t("rg");
  $("tHA").textContent=t("ha");$("tGL").textContent=t("lg");$("tOut").textContent=t("out");
  $("pTxt").placeholder=t("wh");$("tMd").textContent=t("md");$("tAvt").textContent=t("av");
- $("tFN").textContent=t("fn").toUpperCase();$("tRl").textContent=t("rl");
+ $("tFN").textContent=t("fn").toUpperCase();$("tRl").textContent=t("rl");$("tSettings").textContent=t("settings");
  var ro=$("pRole").options;ro[0].text=t("st");ro[1].text=t("tc");
- $("tGeo").textContent=t("geo");$("tCt").textContent=t("ct");$("tRg").textContent=t("rgn");
- $("tSc").textContent=t("sc");$("tKl").textContent=t("kl");
+ $("tGeo").textContent=t("geo");$("tRg").textContent=t("rgn");
+ $("tSc").textContent=t("sc");$("tKl").textContent=t("kl");$("tUniv").textContent=t("univ");
+ $("pUniv").placeholder=t("univPh");$("tLang").textContent=t("lang");
  $("tBd").textContent=t("bd");$("tHd").textContent=t("hd");$("tHt").textContent=t("ht");
  var ho=$("pHt").options;ho[0].text=t("hA");ho[1].text=t("hC");ho[2].text=t("hL");ho[3].text=t("hP");
  $("tSv").textContent=t("sv");$("tAc").textContent=t("ac");
  $("aU").placeholder=t("aU");$("aC").placeholder=t("aC");$("aN").placeholder=t("aN");$("tAB").textContent=t("up");
- $("tCh").textContent=t("chs");$("tNC").textContent=t("nc");$("chHead").textContent=t("slc");$("chInp").placeholder=t("mp");
- $("tEditing").textContent=t("editingMsg");
  $("nInp").placeholder=t("np");$("tPub").textContent=t("pb");$("tBD").textContent=t("bd2");$("tGr").textContent=t("gr");
- $("ceoEB").textContent=t("ed");$("tCS").textContent=t("sv");
- $("fNm").placeholder=t("cN");$("fTt").placeholder=t("cT");$("fBi").placeholder=t("cB");
- $("fTg").placeholder="Telegram @";$("fIg").placeholder="Instagram @";$("fCh").placeholder="Chalker @";
- $("tAddCeo").textContent=t("addCeo");$("tACS").textContent=t("sv");
- $("acNm").placeholder=t("cN");$("acTt").placeholder=t("cT");$("acBi").placeholder=t("cB");
- $("acTg").placeholder="Telegram @";$("acIg").placeholder="Instagram @";$("acCh").placeholder="Chalker @";
- $("qRg").textContent=t("geo")+":";$("qKl").textContent=t("kl")+":";
- $("qBd").textContent=t("bd")+":";$("qHt").textContent=t("ht")+":";$("qMs").textContent=t("sm");
+ $("tAddCert").textContent=t("addCert");$("ctTitle").placeholder=t("certTitle");
+ $("tCtImg").textContent="\u{1F4CE} "+t("certImg");$("tCtAdd").textContent=t("certAdd");$("tDelCert").textContent=t("dl");
+ $("srchInp").placeholder=t("srchPh");$("tSupport").textContent=t("supTitle");$("tSupSave").textContent=t("sv");
  $("eL").innerHTML=EY;$("eR").innerHTML=EY;$("e1").innerHTML=EY;$("e2").innerHTML=EY}
-function setLang(l){LANG=l;localStorage.setItem("chalker_lang",l);applyLang();if(me){buildNav();showView("feed")}}
 function renderSide(){
  $("sAv").src=ava(me.avatar_base64);$("cAv").src=ava(me.avatar_base64);$("mobAv").src=ava(me.avatar_base64);
  $("sNm").innerHTML=esc(me.fullname||me.username)+bdg(me.username,me.can_post_news);
@@ -813,8 +909,7 @@ function renderSide(){
  if(me.username==="boss"||me.can_post_news===1)sh("newsComposer");else hd("newsComposer");
  if(me.username==="boss")sh("bossPanel");else hd("bossPanel")}
 function boot(){
- hd("authView");sh("appView");buildNav();renderSide();showView("feed");
- clearInterval(pollT);pollT=setInterval(function(){if(!$("view-chat").classList.contains("hide")&&partner)loadHist(false)},3000);
+ curView=null;hd("authView");sh("appView");buildNav();renderSide();showView("feed");loadSupport();
  clearInterval(ntT);ntT=setInterval(function(){loadNotifs(false)},20000);loadNotifs(false)}
 document.addEventListener("DOMContentLoaded",function(){
  applyLang();
