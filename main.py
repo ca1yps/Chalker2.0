@@ -64,43 +64,57 @@ def db():
 
 def init():
     c = db()
-    c.executescript("""
-    CREATE TABLE IF NOT EXISTS users(id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL,
-      fullname TEXT, school_class TEXT, school_name TEXT, country TEXT, region TEXT, district TEXT,
-      role TEXT DEFAULT 'student', birth_date TEXT, hide_birth_date INTEGER DEFAULT 0, bio TEXT,
-      heart_status TEXT DEFAULT 'Available', avatar_base64 TEXT, can_post_news INTEGER DEFAULT 0, password TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS posts(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
-      content TEXT, media_base64 TEXT, media_type TEXT, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text);
-    CREATE TABLE IF NOT EXISTS comments(id SERIAL PRIMARY KEY, post_id INTEGER NOT NULL,
-      user_id INTEGER NOT NULL, parent_id INTEGER, content TEXT NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text);
-    CREATE TABLE IF NOT EXISTS likes(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
-      post_id INTEGER NOT NULL, is_like INTEGER NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text);
-    CREATE UNIQUE INDEX IF NOT EXISTS iup ON likes(user_id, post_id);
-    CREATE TABLE IF NOT EXISTS chat_messages(id SERIAL PRIMARY KEY, sender_id INTEGER NOT NULL,
-      receiver_id INTEGER NOT NULL, message TEXT NOT NULL, image_base64 TEXT, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text);
-    CREATE TABLE IF NOT EXISTS follows(follower_id INTEGER NOT NULL, following_id INTEGER NOT NULL,
-      PRIMARY KEY(follower_id, following_id));
-    CREATE TABLE IF NOT EXISTS school_news(id SERIAL PRIMARY KEY, title TEXT NOT NULL,
-      author TEXT, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text);
-    CREATE TABLE IF NOT EXISTS news_likes(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
-      news_id INTEGER NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text);
-    CREATE UNIQUE INDEX IF NOT EXISTS iun ON news_likes(user_id, news_id);
-    CREATE TABLE IF NOT EXISTS news_comments(id SERIAL PRIMARY KEY, news_id INTEGER NOT NULL,
-      user_id INTEGER NOT NULL, content TEXT NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text);
-    CREATE TABLE IF NOT EXISTS ceo_page(id INTEGER PRIMARY KEY, name TEXT, title TEXT, bio TEXT,
-      telegram TEXT, instagram TEXT, chalker TEXT);
-    CREATE TABLE IF NOT EXISTS ceo_extra(id SERIAL PRIMARY KEY, name TEXT, title TEXT, bio TEXT,
-      telegram TEXT, instagram TEXT, chalker TEXT, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text);
-    ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS image_base64 TEXT;
-    ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS is_read INTEGER DEFAULT 0;
-    ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS edited INTEGER DEFAULT 0;
-    """)
-    c.commit()
-    if not c.execute("SELECT id FROM ceo_page WHERE id=1").fetchone():
-        c.execute("INSERT INTO ceo_page VALUES(1,?,?,?,?,?,?)",
-                  ("Ilyosbek Siddiqjonov", "CEO Founder",
-                   "Chalker — o'quvchilar va o'qituvchilar uchun zamonaviy maktab ijtimoiy tarmog'i.",
-                   "@ilyos6ee", "@ilyos6ee", "@boss"))
+    statements = [
+        """CREATE TABLE IF NOT EXISTS users(id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL,
+          fullname TEXT, school_class TEXT, school_name TEXT, country TEXT, region TEXT, district TEXT,
+          role TEXT DEFAULT 'student', birth_date TEXT, hide_birth_date INTEGER DEFAULT 0, bio TEXT,
+          heart_status TEXT DEFAULT 'Available', avatar_base64 TEXT, can_post_news INTEGER DEFAULT 0, password TEXT NOT NULL)""",
+        """CREATE TABLE IF NOT EXISTS posts(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
+          content TEXT, media_base64 TEXT, media_type TEXT, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
+        """CREATE TABLE IF NOT EXISTS comments(id SERIAL PRIMARY KEY, post_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL, parent_id INTEGER, content TEXT NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
+        """CREATE TABLE IF NOT EXISTS likes(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
+          post_id INTEGER NOT NULL, is_like INTEGER NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
+        "CREATE UNIQUE INDEX IF NOT EXISTS iup ON likes(user_id, post_id)",
+        """CREATE TABLE IF NOT EXISTS follows(follower_id INTEGER NOT NULL, following_id INTEGER NOT NULL,
+          PRIMARY KEY(follower_id, following_id))""",
+        """CREATE TABLE IF NOT EXISTS school_news(id SERIAL PRIMARY KEY, title TEXT NOT NULL,
+          author TEXT, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
+        """CREATE TABLE IF NOT EXISTS news_likes(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
+          news_id INTEGER NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
+        "CREATE UNIQUE INDEX IF NOT EXISTS iun ON news_likes(user_id, news_id)",
+        """CREATE TABLE IF NOT EXISTS news_comments(id SERIAL PRIMARY KEY, news_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL, content TEXT NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
+        """CREATE TABLE IF NOT EXISTS support_info(id INTEGER PRIMARY KEY, card_type TEXT DEFAULT 'Humo',
+          card_number TEXT DEFAULT '', card_holder TEXT DEFAULT '')""",
+        """CREATE TABLE IF NOT EXISTS comment_likes(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
+          comment_id INTEGER NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
+        "CREATE UNIQUE INDEX IF NOT EXISTS iucl ON comment_likes(user_id, comment_id)",
+        """CREATE TABLE IF NOT EXISTS news_comment_likes(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
+          comment_id INTEGER NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
+        "CREATE UNIQUE INDEX IF NOT EXISTS iuncl ON news_comment_likes(user_id, comment_id)",
+        """CREATE TABLE IF NOT EXISTS certificates(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
+          title TEXT NOT NULL, image_base64 TEXT, verified INTEGER DEFAULT 1,
+          timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS university TEXT",
+    ]
+    # Each statement runs on its own so one failure (e.g. a stale/partial
+    # previous deploy) can never block the rest of the schema from being
+    # created -- and any real error is printed to the Render logs instead
+    # of silently aborting the whole batch.
+    for stmt in statements:
+        try:
+            c.execute(stmt)
+            c.commit()
+        except Exception as e:
+            print(f"[init] schema statement failed (continuing): {e}")
+            try:
+                c._conn.rollback()
+            except Exception:
+                pass
+    if not c.execute("SELECT id FROM support_info WHERE id=1").fetchone():
+        c.execute("INSERT INTO support_info(id,card_type,card_number,card_holder) VALUES(1,?,?,?)",
+                  ("Humo", "", ""))
     c.commit(); c.close()
 
 
@@ -128,12 +142,6 @@ class LikeReq(BaseModel):
     user_id: int; post_id: int; is_like: int = 1
 class CommentCreate(BaseModel):
     user_id: int; post_id: int; content: str; parent_id: Optional[int] = None
-class ChatSend(BaseModel):
-    sender_id: int; receiver_username: str; message: str = ""; image_base64: Optional[str] = None
-class ChatEdit(BaseModel):
-    user_id: int; message_id: int; message: str
-class ChatDel(BaseModel):
-    user_id: int; message_id: int
 class FollowReq(BaseModel):
     follower_id: int; following_username: str
 class NewsCreate(BaseModel):
@@ -148,23 +156,30 @@ class NewsComment(BaseModel):
     user_id: int; news_id: int; content: str
 class RightsReq(BaseModel):
     boss_id: int; target_username: str
-class CeoUpd(BaseModel):
-    user_id: int; name: str; title: str; bio: str; telegram: str; instagram: str; chalker: str
-class CeoCreate(BaseModel):
-    user_id: int; name: str; title: str = ""; bio: str = ""; telegram: str = ""; instagram: str = ""; chalker: str = ""
-class CeoExtraUpd(BaseModel):
-    user_id: int; ceo_id: int; name: str; title: str = ""; bio: str = ""; telegram: str = ""; instagram: str = ""; chalker: str = ""
-class CeoExtraDel(BaseModel):
-    user_id: int; ceo_id: int
+class SupportUpd(BaseModel):
+    user_id: int; card_type: str; card_number: str = ""; card_holder: str = ""
 class CommentDel(BaseModel):
     user_id: int; comment_id: int
 class NewsCommentDel(BaseModel):
     user_id: int; comment_id: int
+class CommentLikeReq(BaseModel):
+    user_id: int; comment_id: int
+class NewsCommentLikeReq(BaseModel):
+    user_id: int; comment_id: int
+class CertCreate(BaseModel):
+    boss_id: int; target_username: str; title: str; image_base64: Optional[str] = None
+class CertDel(BaseModel):
+    boss_id: int; cert_id: int
+class CertSelfCreate(BaseModel):
+    user_id: int; title: str; image_base64: Optional[str] = None
+class CertSelfDel(BaseModel):
+    user_id: int; cert_id: int
 
 @app.get("/", response_class=HTMLResponse)
 def index():
     with open(INDEX, "r", encoding="utf-8") as f:
-        return f.read()
+        html = f.read()
+    return HTMLResponse(html, headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
 
 @app.get("/api/check_username")
 def check_username(username: str, exclude_id: Optional[int] = None):
@@ -219,12 +234,13 @@ def profile(user_id: int = Form(...), fullname: str = Form(""), school_class: st
             school_name: str = Form(""), country: str = Form(""), region: str = Form(""),
             district: str = Form(""), role: str = Form("student"), bio: str = Form(""),
             birth_date: str = Form(""), hide_birth_date: int = Form(0),
-            heart_status: str = Form("Available"), avatar_base64: str = Form("")):
+            heart_status: str = Form("Available"), avatar_base64: str = Form(""),
+            university: str = Form("")):
     c = db()
     c.execute("""UPDATE users SET fullname=?,school_class=?,school_name=?,country=?,region=?,district=?,
-              role=?,bio=?,birth_date=?,hide_birth_date=?,heart_status=? WHERE id=?""",
+              role=?,bio=?,birth_date=?,hide_birth_date=?,heart_status=?,university=? WHERE id=?""",
               (fullname.strip(), school_class, school_name, country, region, district, role, bio.strip(),
-               birth_date, int(hide_birth_date), heart_status, user_id))
+               birth_date, int(hide_birth_date), heart_status, university.strip(), user_id))
     if avatar_base64:
         c.execute("UPDATE users SET avatar_base64=? WHERE id=?", (avatar_base64, user_id))
     c.commit(); r = urow(c, user_id); c.close()
@@ -243,6 +259,76 @@ def get_user(username: str, viewer_id: Optional[int] = None):
     if int(d.get("hide_birth_date") or 0) == 1 and (viewer_id is None or int(viewer_id) != r["id"]):
         d["birth_date"] = None
     c.close(); return d
+
+@app.get("/api/users/{username}/followers")
+def followers_list(username: str, viewer_id: Optional[int] = None):
+    c = db()
+    u = c.execute("SELECT id FROM users WHERE username=?", (clean_u(username),)).fetchone()
+    if not u: c.close(); return err("Topilmadi!", 404)
+    v = viewer_id if viewer_id is not None else -1
+    rows = c.execute("""SELECT us.id,us.username,us.fullname,us.avatar_base64,us.can_post_news,us.school_name,
+        (SELECT 1 FROM follows WHERE follower_id=? AND following_id=us.id) is_following
+        FROM follows f JOIN users us ON us.id=f.follower_id
+        WHERE f.following_id=? ORDER BY us.username""", (v, u["id"])).fetchall()
+    c.close(); return [{**dict(r), "is_following": bool(r["is_following"])} for r in rows]
+
+@app.get("/api/users/{username}/following")
+def following_list(username: str, viewer_id: Optional[int] = None):
+    c = db()
+    u = c.execute("SELECT id FROM users WHERE username=?", (clean_u(username),)).fetchone()
+    if not u: c.close(); return err("Topilmadi!", 404)
+    v = viewer_id if viewer_id is not None else -1
+    rows = c.execute("""SELECT us.id,us.username,us.fullname,us.avatar_base64,us.can_post_news,us.school_name,
+        (SELECT 1 FROM follows WHERE follower_id=? AND following_id=us.id) is_following
+        FROM follows f JOIN users us ON us.id=f.following_id
+        WHERE f.follower_id=? ORDER BY us.username""", (v, u["id"])).fetchall()
+    c.close(); return [{**dict(r), "is_following": bool(r["is_following"])} for r in rows]
+
+@app.get("/api/certificates")
+def certificates(username: str):
+    c = db()
+    u = c.execute("SELECT id FROM users WHERE username=?", (clean_u(username),)).fetchone()
+    if not u: c.close(); return []
+    rows = c.execute("SELECT * FROM certificates WHERE user_id=? ORDER BY id DESC", (u["id"],)).fetchall()
+    c.close(); return [dict(r) for r in rows]
+
+@app.post("/api/certificates/create")
+def certificate_create(b: CertCreate):
+    c = db(); boss = urow(c, b.boss_id)
+    if not boss or boss["username"] != "boss": c.close(); return err("Faqat @boss!", 403)
+    if not b.title.strip(): c.close(); return err("Nomi majburiy!")
+    tg = c.execute("SELECT id FROM users WHERE username=?", (clean_u(b.target_username),)).fetchone()
+    if not tg: c.close(); return err("Topilmadi!", 404)
+    c.execute("INSERT INTO certificates(user_id,title,image_base64) VALUES(?,?,?)",
+              (tg["id"], b.title.strip(), b.image_base64))
+    c.commit(); c.close(); return {"success": True}
+
+@app.post("/api/certificates/delete")
+def certificate_delete(b: CertDel):
+    c = db(); boss = urow(c, b.boss_id)
+    if not boss or boss["username"] != "boss": c.close(); return err("Faqat @boss!", 403)
+    c.execute("DELETE FROM certificates WHERE id=?", (b.cert_id,))
+    c.commit(); c.close(); return {"success": True}
+
+@app.post("/api/certificates/self_create")
+def certificate_self_create(b: CertSelfCreate):
+    if not b.title.strip(): return err("Nomi majburiy!")
+    c = db()
+    if not urow(c, b.user_id): c.close(); return err("Foydalanuvchi topilmadi!", 404)
+    c.execute("INSERT INTO certificates(user_id,title,image_base64) VALUES(?,?,?)",
+              (b.user_id, b.title.strip(), b.image_base64))
+    c.commit(); c.close(); return {"success": True}
+
+@app.post("/api/certificates/self_delete")
+def certificate_self_delete(b: CertSelfDel):
+    c = db()
+    r = c.execute("SELECT user_id FROM certificates WHERE id=?", (b.cert_id,)).fetchone()
+    if not r: c.close(); return err("Topilmadi!", 404)
+    requester = urow(c, b.user_id)
+    if r["user_id"] != b.user_id and not (requester and requester["username"] == "boss"):
+        c.close(); return err("Ruxsat yo'q!", 403)
+    c.execute("DELETE FROM certificates WHERE id=?", (b.cert_id,))
+    c.commit(); c.close(); return {"success": True}
 
 @app.post("/api/posts/create")
 def post_create(b: PostCreate):
@@ -271,15 +357,21 @@ def post_delete(b: PostDel):
     c.commit(); c.close(); return {"success": True}
 
 @app.get("/api/posts")
-def posts(user_id: Optional[int] = None):
+def posts(user_id: Optional[int] = None, author: Optional[str] = None):
     v = user_id if user_id is not None else -1
     c = db()
-    rows = c.execute("""SELECT p.id,p.user_id,p.content,p.media_base64,p.media_type,p.timestamp,
+    sql = """SELECT p.id,p.user_id,p.content,p.media_base64,p.media_type,p.timestamp,
         u.username,u.fullname,u.avatar_base64,u.can_post_news,
         (SELECT COUNT(*) FROM likes l WHERE l.post_id=p.id AND l.is_like=1) likes_count,
         (SELECT COUNT(*) FROM comments cm WHERE cm.post_id=p.id) comments_count,
         (SELECT l.is_like FROM likes l WHERE l.post_id=p.id AND l.user_id=?) my_status
-        FROM posts p JOIN users u ON u.id=p.user_id ORDER BY p.id DESC""", (v,)).fetchall()
+        FROM posts p JOIN users u ON u.id=p.user_id"""
+    params = [v]
+    if author:
+        sql += " WHERE u.username=?"
+        params.append(clean_u(author))
+    sql += " ORDER BY p.id DESC"
+    rows = c.execute(sql, tuple(params)).fetchall()
     c.close(); return [dict(r) for r in rows]
 
 @app.post("/api/posts/like")
@@ -303,12 +395,26 @@ def comment_create(b: CommentCreate):
     c.commit(); c.close(); return {"success": True}
 
 @app.get("/api/comments")
-def comments(post_id: int):
+def comments(post_id: int, viewer_id: Optional[int] = None):
+    v = viewer_id if viewer_id is not None else -1
     c = db()
     rows = c.execute("""SELECT c.id,c.parent_id,c.content,c.timestamp,u.username,u.fullname,
-        u.avatar_base64,u.can_post_news FROM comments c JOIN users u ON u.id=c.user_id
-        WHERE c.post_id=? ORDER BY c.id ASC""", (post_id,)).fetchall()
+        u.avatar_base64,u.can_post_news,
+        (SELECT COUNT(*) FROM comment_likes cl WHERE cl.comment_id=c.id) likes_count,
+        (SELECT 1 FROM comment_likes cl WHERE cl.comment_id=c.id AND cl.user_id=?) my_like
+        FROM comments c JOIN users u ON u.id=c.user_id
+        WHERE c.post_id=? ORDER BY c.id ASC""", (v, post_id)).fetchall()
     c.close(); return [dict(r) for r in rows]
+
+@app.post("/api/comments/like")
+def comment_like(b: CommentLikeReq):
+    c = db()
+    if c.execute("SELECT 1 FROM comment_likes WHERE user_id=? AND comment_id=?", (b.user_id, b.comment_id)).fetchone():
+        c.execute("DELETE FROM comment_likes WHERE user_id=? AND comment_id=?", (b.user_id, b.comment_id)); liked = False
+    else:
+        c.execute("INSERT INTO comment_likes(user_id,comment_id) VALUES(?,?)", (b.user_id, b.comment_id)); liked = True
+    cnt = c.execute("SELECT COUNT(*) cnt FROM comment_likes WHERE comment_id=?", (b.comment_id,)).fetchone()["cnt"]
+    c.commit(); c.close(); return {"liked": liked, "count": cnt}
 
 @app.post("/api/comments/delete")
 def comment_delete(b: CommentDel):
@@ -321,60 +427,35 @@ def comment_delete(b: CommentDel):
     c.execute("DELETE FROM comments WHERE id=? OR parent_id=?", (b.comment_id, b.comment_id))
     c.commit(); c.close(); return {"success": True}
 
-@app.post("/api/chat/send")
-def chat_send(b: ChatSend):
-    if not b.message.strip() and not b.image_base64: return err("Xabar bo'sh!")
+@app.get("/api/search")
+def search(q: str = "", viewer_id: Optional[int] = None):
+    q = q.strip()
+    if not q:
+        return []
     c = db()
-    r = c.execute("SELECT id FROM users WHERE username=?", (clean_u(b.receiver_username),)).fetchone()
-    if not r: c.close(); return err("Qabul qiluvchi topilmadi!", 404)
-    c.execute("INSERT INTO chat_messages(sender_id,receiver_id,message,image_base64) VALUES(?,?,?,?)",
-              (b.sender_id, r["id"], b.message.strip(), b.image_base64))
+    like = f"%{q}%"
+    v = viewer_id if viewer_id is not None else -1
+    rows = c.execute("""SELECT id,username,fullname,avatar_base64,can_post_news,school_name,
+        (SELECT 1 FROM follows WHERE follower_id=? AND following_id=users.id) is_following
+        FROM users WHERE username ILIKE ? OR fullname ILIKE ?
+        ORDER BY (username ILIKE ?) DESC, username ASC LIMIT 25""",
+        (v, like, like, q + "%")).fetchall()
+    c.close()
+    return [{**dict(r), "is_following": bool(r["is_following"])} for r in rows]
+
+@app.get("/api/support")
+def support_get():
+    c = db()
+    r = c.execute("SELECT card_type,card_number,card_holder FROM support_info WHERE id=1").fetchone()
+    c.close(); return dict(r) if r else {"card_type": "Humo", "card_number": "", "card_holder": ""}
+
+@app.post("/api/support/update")
+def support_update(b: SupportUpd):
+    c = db(); boss = urow(c, b.user_id)
+    if not boss or boss["username"] != "boss": c.close(); return err("Faqat @boss!", 403)
+    c.execute("UPDATE support_info SET card_type=?,card_number=?,card_holder=? WHERE id=1",
+              (b.card_type.strip(), b.card_number.strip(), b.card_holder.strip()))
     c.commit(); c.close(); return {"success": True}
-
-@app.post("/api/chat/edit")
-def chat_edit(b: ChatEdit):
-    if not b.message.strip(): return err("Xabar bo'sh!")
-    c = db()
-    r = c.execute("SELECT sender_id FROM chat_messages WHERE id=?", (b.message_id,)).fetchone()
-    if not r: c.close(); return err("Xabar topilmadi!", 404)
-    if r["sender_id"] != b.user_id: c.close(); return err("Ruxsat yo'q!", 403)
-    c.execute("UPDATE chat_messages SET message=?,edited=1 WHERE id=?", (b.message.strip(), b.message_id))
-    c.commit(); c.close(); return {"success": True}
-
-@app.post("/api/chat/delete")
-def chat_delete(b: ChatDel):
-    c = db()
-    r = c.execute("SELECT sender_id FROM chat_messages WHERE id=?", (b.message_id,)).fetchone()
-    if not r: c.close(); return err("Xabar topilmadi!", 404)
-    if r["sender_id"] != b.user_id: c.close(); return err("Ruxsat yo'q!", 403)
-    c.execute("DELETE FROM chat_messages WHERE id=?", (b.message_id,))
-    c.commit(); c.close(); return {"success": True}
-
-@app.get("/api/chat/history")
-def chat_history(user_id: int, partner_username: str):
-    c = db()
-    p = c.execute("SELECT id,username,fullname,avatar_base64,can_post_news FROM users WHERE username=?",
-                  (clean_u(partner_username),)).fetchone()
-    if not p: c.close(); return err("Foydalanuvchi topilmadi!", 404)
-    c.execute("UPDATE chat_messages SET is_read=1 WHERE sender_id=? AND receiver_id=? AND is_read=0",
-              (p["id"], user_id))
-    c.commit()
-    rows = c.execute("""SELECT * FROM chat_messages WHERE (sender_id=? AND receiver_id=?)
-        OR (sender_id=? AND receiver_id=?) ORDER BY id ASC""",
-        (user_id, p["id"], p["id"], user_id)).fetchall()
-    c.close(); return {"partner": dict(p), "messages": [dict(r) for r in rows]}
-
-@app.get("/api/chat/active_users")
-def chat_users(user_id: int):
-    c = db()
-    rows = c.execute("""SELECT u.id,u.username,u.fullname,u.avatar_base64,u.can_post_news,
-        (SELECT message FROM chat_messages m WHERE (m.sender_id=u.id AND m.receiver_id=?)
-         OR (m.sender_id=? AND m.receiver_id=u.id) ORDER BY m.id DESC LIMIT 1) last_message,
-        (SELECT COUNT(*) FROM chat_messages m WHERE m.sender_id=u.id AND m.receiver_id=? AND m.is_read=0) unread_count
-        FROM users u WHERE u.id IN (SELECT sender_id FROM chat_messages WHERE receiver_id=?
-        UNION SELECT receiver_id FROM chat_messages WHERE sender_id=?) AND u.id!=?""",
-        (user_id, user_id, user_id, user_id, user_id, user_id)).fetchall()
-    c.close(); return [dict(r) for r in rows]
 
 @app.post("/api/users/follow")
 def follow(b: FollowReq):
@@ -440,12 +521,25 @@ def news_comment(b: NewsComment):
     c.commit(); c.close(); return {"success": True}
 
 @app.get("/api/news/comments")
-def news_comments(news_id: int):
+def news_comments(news_id: int, viewer_id: Optional[int] = None):
+    v = viewer_id if viewer_id is not None else -1
     c = db()
-    rows = c.execute("""SELECT m.id,m.content,m.timestamp,u.username,u.fullname,u.avatar_base64,u.can_post_news
+    rows = c.execute("""SELECT m.id,m.content,m.timestamp,u.username,u.fullname,u.avatar_base64,u.can_post_news,
+        (SELECT COUNT(*) FROM news_comment_likes cl WHERE cl.comment_id=m.id) likes_count,
+        (SELECT 1 FROM news_comment_likes cl WHERE cl.comment_id=m.id AND cl.user_id=?) my_like
         FROM news_comments m JOIN users u ON u.id=m.user_id WHERE m.news_id=? ORDER BY m.id ASC""",
-        (news_id,)).fetchall()
+        (v, news_id)).fetchall()
     c.close(); return [dict(r) for r in rows]
+
+@app.post("/api/news/comments/like")
+def news_comment_like(b: NewsCommentLikeReq):
+    c = db()
+    if c.execute("SELECT 1 FROM news_comment_likes WHERE user_id=? AND comment_id=?", (b.user_id, b.comment_id)).fetchone():
+        c.execute("DELETE FROM news_comment_likes WHERE user_id=? AND comment_id=?", (b.user_id, b.comment_id)); liked = False
+    else:
+        c.execute("INSERT INTO news_comment_likes(user_id,comment_id) VALUES(?,?)", (b.user_id, b.comment_id)); liked = True
+    cnt = c.execute("SELECT COUNT(*) cnt FROM news_comment_likes WHERE comment_id=?", (b.comment_id,)).fetchone()["cnt"]
+    c.commit(); c.close(); return {"liked": liked, "count": cnt}
 
 @app.post("/api/news/comments/delete")
 def news_comment_delete(b: NewsCommentDel):
@@ -472,10 +566,6 @@ def notifications(user_id: int):
         WHERE p.user_id=? AND m.user_id!=? ORDER BY m.id DESC LIMIT 10""",
         (user_id, user_id)).fetchall():
         out.append({"type": "comment", **dict(r)})
-    for r in c.execute("""SELECT m.timestamp ts, u.username, u.fullname, m.message snippet FROM chat_messages m
-        JOIN users u ON u.id=m.sender_id WHERE m.receiver_id=? ORDER BY m.id DESC LIMIT 10""",
-        (user_id,)).fetchall():
-        out.append({"type": "message", **dict(r)})
     for r in c.execute("SELECT timestamp ts, author username, author fullname, title snippet FROM school_news ORDER BY id DESC LIMIT 5").fetchall():
         out.append({"type": "news", **dict(r)})
     c.close()
@@ -491,53 +581,6 @@ def rights(b: RightsReq):
     nv = 0 if tg["can_post_news"] == 1 else 1
     c.execute("UPDATE users SET can_post_news=? WHERE id=?", (nv, tg["id"]))
     c.commit(); c.close(); return {"granted": bool(nv)}
-
-@app.get("/api/ceo")
-def ceo():
-    c = db(); r = c.execute("SELECT * FROM ceo_page WHERE id=1").fetchone(); c.close(); return dict(r)
-
-@app.post("/api/ceo/update")
-def ceo_update(b: CeoUpd):
-    c = db(); boss = urow(c, b.user_id)
-    if not boss or boss["username"] != "boss": c.close(); return err("Faqat @boss!", 403)
-    c.execute("UPDATE ceo_page SET name=?,title=?,bio=?,telegram=?,instagram=?,chalker=? WHERE id=1",
-              (b.name.strip(), b.title.strip(), b.bio.strip(), b.telegram.strip(), b.instagram.strip(), b.chalker.strip()))
-    c.commit(); c.close(); return {"success": True}
-
-@app.get("/api/ceo/list")
-def ceo_list():
-    c = db()
-    rows = c.execute("SELECT * FROM ceo_extra ORDER BY id ASC").fetchall()
-    c.close(); return [dict(r) for r in rows]
-
-@app.post("/api/ceo/create")
-def ceo_create(b: CeoCreate):
-    c = db(); boss = urow(c, b.user_id)
-    if not boss or boss["username"] != "boss": c.close(); return err("Faqat @boss!", 403)
-    if not b.name.strip(): c.close(); return err("Ism majburiy!")
-    cur = c.execute("""INSERT INTO ceo_extra(name,title,bio,telegram,instagram,chalker) VALUES(?,?,?,?,?,?)
-              RETURNING id""",
-              (b.name.strip(), b.title.strip(), b.bio.strip(), b.telegram.strip(), b.instagram.strip(), b.chalker.strip()))
-    new_id = cur.fetchone()["id"]
-    c.commit(); c.close(); return {"success": True, "id": new_id}
-
-@app.post("/api/ceo/extra/update")
-def ceo_extra_update(b: CeoExtraUpd):
-    c = db(); boss = urow(c, b.user_id)
-    if not boss or boss["username"] != "boss": c.close(); return err("Faqat @boss!", 403)
-    if not b.name.strip(): c.close(); return err("Ism majburiy!")
-    if not c.execute("SELECT id FROM ceo_extra WHERE id=?", (b.ceo_id,)).fetchone():
-        c.close(); return err("Topilmadi!", 404)
-    c.execute("UPDATE ceo_extra SET name=?,title=?,bio=?,telegram=?,instagram=?,chalker=? WHERE id=?",
-              (b.name.strip(), b.title.strip(), b.bio.strip(), b.telegram.strip(), b.instagram.strip(), b.chalker.strip(), b.ceo_id))
-    c.commit(); c.close(); return {"success": True}
-
-@app.post("/api/ceo/extra/delete")
-def ceo_extra_delete(b: CeoExtraDel):
-    c = db(); boss = urow(c, b.user_id)
-    if not boss or boss["username"] != "boss": c.close(); return err("Faqat @boss!", 403)
-    c.execute("DELETE FROM ceo_extra WHERE id=?", (b.ceo_id,))
-    c.commit(); c.close(); return {"success": True}
 
 if __name__ == "__main__":
     import uvicorn
