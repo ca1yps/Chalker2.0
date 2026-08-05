@@ -18,7 +18,7 @@ from pydantic import BaseModel
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
     "postgresql://postgres.lbypohelsiicjjfucppa:Ilyo%246eey06072009@"
-    "aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true",
+    "aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres?",
 )
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
