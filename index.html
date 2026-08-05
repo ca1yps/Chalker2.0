@@ -64,6 +64,14 @@ select{cursor:pointer}
 
 /* post/news cards */
 .pc{position:relative;transition:background-color .18s ease}
+/* ---------- minimal flat post actions ---------- */
+.pAct{display:inline-flex;align-items:center;gap:5px;color:#8b9198;font-size:12.5px;font-weight:700;background:none;border:none;
+ padding:5px 8px;border-radius:8px;transition:color .15s ease,background-color .15s ease,transform .15s ease}
+.pAct:hover{background:rgba(255,255,255,.05);color:#d6d9db}
+.pAct:active{transform:scale(.94)}
+.pAct svg{width:15px;height:15px}
+.pAct.on{color:#f91880}
+.pAct.on svg{fill:#f91880;stroke:#f91880}
 .pc:hover{background:#080909}
 .pc::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,transparent,rgba(47,51,54,.7) 15%,rgba(47,51,54,.7) 85%,transparent)}
 
@@ -178,6 +186,12 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
 .gearBtn:hover{border-color:var(--sky);color:#fff;transform:rotate(45deg)}
 .gearBtn:active{transform:rotate(70deg) scale(.92)}
 
+/* ---------- profile info chips ---------- */
+.infoChip{display:inline-flex;align-items:baseline;gap:3px}
+.infoChip b{color:#d6d9db;font-weight:700}
+.infoChip .lbl{text-transform:capitalize}
+.infoDot{color:#3d4146}
+
 /* ---------- trophy cabinet ---------- */
 .trophyGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:14px}
 .trophyCard{position:relative;aspect-ratio:3/4;border-radius:16px;overflow:hidden;cursor:pointer;
@@ -255,7 +269,7 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
    <div class="border-b brd p-3 sm:p-4"><div class="flex gap-2.5 sm:gap-3">
     <img id="cAv" class="w-11 h-11 rounded-full object-cover bg-neutral-800">
     <div class="flex-1">
-     <textarea id="pTxt" rows="2" class="w-full bg-transparent text-lg resize-none"></textarea>
+     <textarea id="pTxt" rows="2" oninput="autoGrow(this)" class="w-full bg-transparent text-lg resize-none overflow-hidden leading-snug"></textarea>
      <div id="mBox" class="hide mt-2 relative">
       <img id="mImg" class="hide max-h-72 w-full rounded-2xl border brd object-contain bg-black/20">
       <video id="mVid" class="hide max-h-72 rounded-2xl border brd w-full" controls></video>
@@ -263,7 +277,7 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
      </div>
      <div class="flex items-center justify-between mt-2 border-t brd pt-3">
       <label class="cursor-pointer text-sky-500 rounded-full px-3 py-1.5 text-sm font-semibold hover:bg-sky-500/10">
-       &#128444; <span id="tMd"></span><input id="mInp" type="file" accept="image/*" class="hide" onchange="pickMedia(this)"></label>
+       <span id="tMd"></span><input id="mInp" type="file" accept="image/*" class="hide" onchange="pickMedia(this)"></label>
       <button onclick="createPost()" class="bb text-white font-bold rounded-full px-7 py-2">Chalk</button>
      </div>
     </div>
@@ -283,7 +297,7 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
 
   <div id="view-profile" class="hide">
    <div class="pcover"></div>
-   <div class="p-4 sm:p-6 max-w-lg space-y-4 anim -mt-10">
+   <div class="p-4 sm:p-6 max-w-lg mx-auto space-y-4 anim -mt-10">
     <div class="flex items-end justify-between">
      <img id="vpAv" class="w-20 h-20 rounded-full object-cover bg-neutral-800 border-4 border-black shrink-0">
      <div class="flex items-center gap-2 mb-1">
@@ -296,8 +310,7 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
     <div>
      <h2 id="vpName" class="text-xl font-extrabold"></h2>
      <p id="vpUn" class="text-gray-500 text-sm"></p>
-     <p class="text-xs font-bold mt-1"><span id="vpRole" class="text-sky-500"></span><span id="vpHeart" class="text-gray-500"></span></p>
-     <p id="vpMeta" class="text-xs text-gray-500 mt-1"></p>
+     <div id="vpInfo" class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-gray-400"></div>
      <p id="vpBio" class="text-gray-300 text-sm mt-2 italic"></p>
      <p id="vpUniv" class="text-xs text-amber-400 mt-1 font-semibold"></p>
     </div>
@@ -336,7 +349,7 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
    <div id="srchList" class="p-2"></div>
   </div>
 
-  <div id="view-support" class="hide lg:hidden p-4 sm:p-6 max-w-lg space-y-4 anim">
+  <div id="view-support" class="hide lg:hidden p-4 sm:p-6 max-w-lg mx-auto space-y-4 anim">
    <div class="border brd rounded-2xl p-4 panel">
     <h3 id="tSupportM" class="font-extrabold text-base mb-3 text-sky-500"></h3>
     <div id="supportShowM" class="space-y-1"></div>
@@ -350,7 +363,7 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
     </div>
     <button id="supEditBtnM" onclick="toggleSupportEdit()" class="hide mt-3 w-full border brd rounded-full py-2 text-xs font-bold hover:bg-neutral-900"></button>
    </div>
-   <div class="text-center text-[11px] text-gray-600 leading-relaxed pb-2">
+   <div class="text-center text-[11px] text-white leading-relaxed pb-2">
     <p>CEO Founder - Ilyosbek Siddiqjonov</p><p>Copyright &copy; 2026 Chalker</p>
    </div>
   </div>
@@ -405,7 +418,7 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
    <div><label id="tFN" class="text-gray-500 text-xs font-bold"></label><input id="pFn" class="inp"></div>
    <div><label id="tRl" class="text-gray-500 text-xs font-bold"></label>
     <select id="pRole" class="inp"><option value="student"></option><option value="teacher"></option></select></div>
-   <div><label class="text-gray-500 text-xs font-bold">BIO</label><textarea id="pBio" rows="3" class="inp resize-none"></textarea></div>
+   <div><label class="text-gray-500 text-xs font-bold">BIO</label><textarea id="pBio" rows="3" oninput="autoGrow(this)" class="inp resize-none overflow-hidden"></textarea></div>
    <div><label id="tUniv" class="text-gray-500 text-xs font-bold"></label><input id="pUniv" type="text" class="inp"></div>
    <div class="border brd rounded-2xl p-4 space-y-3 panel">
     <p id="tGeo" class="text-sm font-bold text-sky-500"></p>
@@ -470,9 +483,9 @@ var LANG=localStorage.getItem("chalker_lang")||"uz";
 window.onerror=function(m,s,l){alert("JS xato: "+m+" ("+l+")")};
 
 var TR={
-uz:{slogan:"Maktab ijtimoiy tarmog'i",tag:"Fikrlaring bilan maktabni bo'yab tashla!",lg:"Kirish",rg:"Ro'yxatdan o'tish",na:"Akkount yo'qmi?",ha:"Akkount bormi?",un:"Username",pw:"Parol",fn:"To'liq ism",uT:"Band",uF:"Bo'sh",v1:"Chalking",v2:"Yangiliklar",v3:"Profil",v4:"Chat",v5:"Bildirishnoma",v6:"Til",v7:"CEO",out:"Chiqish",wh:"Nima gaplar?!",md:"Rasm",ef:"Postlar yo'q. Birinchi bo'l!",av:"Avatar",rl:"MAQOM",st:"O'quvchi",tc:"O'qituvchi",geo:"Hudud va maktab",ct:"DAVLAT",rgn:"VILOYAT",sc:"MAKTAB",kl:"SINF",c1:"Davlatni tanlang",c2:"Viloyatni tanlang",c4:"Maktabni tanlang",c5:"Sinfni tanlang",bd:"TUG'ILGAN KUN",hd:"Yashirish",ht:"YURAK",hA:"Bo'sh",hC:"Murakkab",hL:"Band",hP:"Sir",sv:"Saqlash",svd:"Saqlandi!",ac:"Akkount xavfsizligi",aU:"Yangi username",aC:"Joriy parol",aN:"Yangi parol",up:"Yangilash",chs:"Chatlar",nc:"+ Yangi",slc:"Suhbatni tanlang",mp:"Xabar yozing...",nch:"Suhbatlar yo'q",pu:"Username kiriting:",np:"Yangi e'lon...",pb:"E'lon qilish",nn:"Yangiliklar yo'q",bd2:"Yangilik huquqini berish/olish",gr:"Huquqni almashtirish",ed:"Tahrirlash",dl:"O'chirish",fl:"Follow",uf:"Unfollow",sm:"Xabar yozish",hdn:"Yashirin",rp:"Javob yozing...",snd:"Yuborish",fc:"Birinchi komment yoz",cn:"bekor",cd:"Rostdan o'chirasizmi?",ep:"Yangi matn:",rpl:"Javob",nnt:"Bildirishnomalar yo'q",l1:"yurakcha bosdi",l2:"komment yozdi",l3:"xabar yubordi",l4:"yangi e'lon",cN:"Ism",cT:"Lavozim",cB:"Bio",addCeo:"Yangi CEO qo'shish",today:"Bugun",yesterday:"Kecha",editedTag:"(tahrirlangan)",editingMsg:"Xabar tahrirlanmoqda...",vS:"Qidiruv",srchPh:"Foydalanuvchi qidirish...",nosr:"Hech kim topilmadi",noCard:"Karta hali kiritilmagan",supTitle:"Homiylik",supEdit:"Tahrirlash",settings:"Sozlamalar",trophy:"Trophy Cabinet",noTr:"Sertifikatlar hali yo'q",univ:"Qaysi oliygohga topshiryapsiz?",univPh:"Masalan: TATU, INHA, Milliy universitet...",lang:"TIL",followers:"Obunachilar",following:"Obunalar",noFol:"Hozircha hech kim yo'q",myPosts:"Postlari",noMyPosts:"Postlar yo'q",verified:"Tasdiqlangan",addCert:"Sertifikat berish",certTitle:"Sertifikat nomi",certUser:"@username",certImg:"Rasm biriktirish",certAdd:"Berish",closeX:"Yopish",support:"Homiylik"},
-en:{slogan:"School social network",tag:"Chalk up your school with your thoughts!",lg:"Log in",rg:"Sign up",na:"No account?",ha:"Have an account?",un:"Username",pw:"Password",fn:"Full name",uT:"Taken",uF:"Available",v1:"Chalking",v2:"News",v3:"Profile",v4:"Chat",v5:"Notifications",v6:"Language",v7:"CEO",out:"Log out",wh:"What's happening?!",md:"Image",ef:"No posts yet. Be first!",av:"Avatar",rl:"ROLE",st:"Student",tc:"Teacher",geo:"Region & school",ct:"COUNTRY",rgn:"REGION",sc:"SCHOOL",kl:"CLASS",c1:"Select country",c2:"Select region",c4:"Select school",c5:"Select class",bd:"BIRTHDAY",hd:"Hide",ht:"HEART",hA:"Available",hC:"Complicated",hL:"Locked",hP:"Private",sv:"Save",svd:"Saved!",ac:"Account security",aU:"New username",aC:"Current password",aN:"New password",up:"Update",chs:"Chats",nc:"+ New",slc:"Select a chat",mp:"Type a message...",nch:"No chats",pu:"Enter username:",np:"New announcement...",pb:"Publish",nn:"No news",bd2:"Grant/revoke news rights",gr:"Toggle rights",ed:"Edit",dl:"Delete",fl:"Follow",uf:"Unfollow",sm:"Message",hdn:"Hidden",rp:"Write a reply...",snd:"Send",fc:"Be first to comment",cn:"cancel",cd:"Really delete?",ep:"New text:",rpl:"Reply",nnt:"No notifications",l1:"liked your post",l2:"commented",l3:"sent a message",l4:"new announcement",cN:"Name",cT:"Title",cB:"Bio",addCeo:"Add new CEO",today:"Today",yesterday:"Yesterday",editedTag:"(edited)",editingMsg:"Editing message...",vS:"Search",srchPh:"Search users...",nosr:"No users found",noCard:"Card not set yet",supTitle:"Support",supEdit:"Edit",settings:"Settings",trophy:"Trophy Cabinet",noTr:"No certificates yet",univ:"Which university are you applying to?",univPh:"e.g. TATU, INHA, National University...",lang:"LANGUAGE",followers:"Followers",following:"Following",noFol:"No one here yet",myPosts:"Posts",noMyPosts:"No posts",verified:"Verified",addCert:"Grant certificate",certTitle:"Certificate title",certUser:"@username",certImg:"Attach image",certAdd:"Grant",closeX:"Close",support:"Support"},
-ru:{slogan:"Школьная соцсеть",tag:"Раскрась школу своими мыслями!",lg:"Войти",rg:"Регистрация",na:"Нет аккаунта?",ha:"Есть аккаунт?",un:"Имя пользователя",pw:"Пароль",fn:"Полное имя",uT:"Занято",uF:"Свободно",v1:"Chalking",v2:"Новости",v3:"Профиль",v4:"Чат",v5:"Уведомления",v6:"Язык",v7:"CEO",out:"Выйти",wh:"Что нового?!",md:"Фото",ef:"Постов нет. Будьте первым!",av:"Аватар",rl:"СТАТУС",st:"Ученик",tc:"Учитель",geo:"Регион и школа",ct:"СТРАНА",rgn:"ОБЛАСТЬ",sc:"ШКОЛА",kl:"КЛАСС",c1:"Выберите страну",c2:"Выберите область",c4:"Выберите школу",c5:"Выберите класс",bd:"ДЕНЬ РОЖДЕНИЯ",hd:"Скрыть",ht:"СЕРДЦЕ",hA:"Свободен(а)",hC:"Всё сложно",hL:"Занят(а)",hP:"Секрет",sv:"Сохранить",svd:"Сохранено!",ac:"Безопасность",aU:"Новый username",aC:"Текущий пароль",aN:"Новый пароль",up:"Обновить",chs:"Чаты",nc:"+ Новый",slc:"Выберите чат",mp:"Сообщение...",nch:"Чатов нет",pu:"Введите username:",np:"Новое объявление...",pb:"Опубликовать",nn:"Новостей нет",bd2:"Право на новости",gr:"Переключить право",ed:"Изменить",dl:"Удалить",fl:"Подписаться",uf:"Отписаться",sm:"Написать",hdn:"Скрыто",rp:"Ответ...",snd:"Отправить",cn:"отмена",fc:"Будьте первым",cd:"Точно удалить?",ep:"Новый текст:",rpl:"Ответить",nnt:"Уведомлений нет",l1:"понравился ваш пост",l2:"комментировал",l3:"отправил сообщение",l4:"новое объявление",cN:"Имя",cT:"Должность",cB:"Био",addCeo:"Добавить нового CEO",today:"Сегодня",yesterday:"Вчера",editedTag:"(изменено)",editingMsg:"Редактирование сообщения...",vS:"Поиск",srchPh:"Поиск пользователей...",nosr:"Никто не найден",noCard:"Карта ещё не указана",supTitle:"Поддержка",supEdit:"Изменить",settings:"Настройки",trophy:"Трофеи",noTr:"Сертификатов пока нет",univ:"В какой университет вы поступаете?",univPh:"напр. TATU, INHA, Национальный университет...",lang:"ЯЗЫК",followers:"Подписчики",following:"Подписки",noFol:"Пока никого нет",myPosts:"Посты",noMyPosts:"Постов нет",verified:"Подтверждено",addCert:"Выдать сертификат",certTitle:"Название сертификата",certUser:"@username",certImg:"Прикрепить фото",certAdd:"Выдать",closeX:"Закрыть",support:"Поддержка"}};
+uz:{slogan:"Maktab ijtimoiy tarmog'i",tag:"Fikrlaring bilan maktabni bo'yab tashla!",lg:"Kirish",rg:"Ro'yxatdan o'tish",na:"Akkount yo'qmi?",ha:"Akkount bormi?",un:"Username",pw:"Parol",fn:"To'liq ism",uT:"Band",uF:"Bo'sh",v1:"Chalking",v2:"Yangiliklar",v3:"Profil",v4:"Chat",v5:"Bildirishnoma",v6:"Til",v7:"CEO",out:"Chiqish",wh:"Nima gaplar?!",md:"Rasm",ef:"Postlar yo'q. Birinchi bo'l!",av:"Avatar",rl:"MAQOM",st:"O'quvchi",tc:"O'qituvchi",geo:"Hudud va maktab",ct:"DAVLAT",rgn:"VILOYAT",sc:"MAKTAB",kl:"SINF",c1:"Davlatni tanlang",c2:"Viloyatni tanlang",c4:"Maktabni tanlang",c5:"Sinfni tanlang",bd:"TUG'ILGAN KUN",hd:"Yashirish",ht:"YURAK",hA:"Bo'sh",hC:"Murakkab",hL:"Band",hP:"Sir",sv:"Saqlash",svd:"Saqlandi!",ac:"Akkount xavfsizligi",aU:"Yangi username",aC:"Joriy parol",aN:"Yangi parol",up:"Yangilash",chs:"Chatlar",nc:"+ Yangi",slc:"Suhbatni tanlang",mp:"Xabar yozing...",nch:"Suhbatlar yo'q",pu:"Username kiriting:",np:"Yangi e'lon...",pb:"E'lon qilish",nn:"Yangiliklar yo'q",bd2:"Yangilik huquqini berish/olish",gr:"Huquqni almashtirish",ed:"Tahrirlash",dl:"O'chirish",fl:"Follow",uf:"Unfollow",sm:"Xabar yozish",hdn:"Yashirin",rp:"Javob yozing...",snd:"Yuborish",fc:"Birinchi komment yoz",cn:"bekor",cd:"Rostdan o'chirasizmi?",ep:"Yangi matn:",rpl:"Javob",nnt:"Bildirishnomalar yo'q",l1:"yurakcha bosdi",l2:"komment yozdi",l3:"xabar yubordi",l4:"yangi e'lon",cN:"Ism",cT:"Lavozim",cB:"Bio",addCeo:"Yangi CEO qo'shish",today:"Bugun",yesterday:"Kecha",editedTag:"(tahrirlangan)",editingMsg:"Xabar tahrirlanmoqda...",vS:"Qidiruv",srchPh:"Foydalanuvchi qidirish...",nosr:"Hech kim topilmadi",noCard:"Karta hali kiritilmagan",supTitle:"Homiylik",supEdit:"Tahrirlash",ul:"Ulashish",shCopied:"Havola nusxalandi!",settings:"Sozlamalar",trophy:"Trophy Cabinet",noTr:"Sertifikatlar hali yo'q",univ:"Qaysi oliygohga topshiryapsiz?",univPh:"Masalan: TATU, INHA, Milliy universitet...",lang:"TIL",followers:"Obunachilar",following:"Obunalar",noFol:"Hozircha hech kim yo'q",myPosts:"Postlari",noMyPosts:"Postlar yo'q",verified:"Tasdiqlangan",addCert:"Sertifikat berish",certTitle:"Sertifikat nomi",certUser:"@username",certImg:"Rasm biriktirish",certAdd:"Berish",closeX:"Yopish",support:"Homiylik"},
+en:{slogan:"School social network",tag:"Chalk up your school with your thoughts!",lg:"Log in",rg:"Sign up",na:"No account?",ha:"Have an account?",un:"Username",pw:"Password",fn:"Full name",uT:"Taken",uF:"Available",v1:"Chalking",v2:"News",v3:"Profile",v4:"Chat",v5:"Notifications",v6:"Language",v7:"CEO",out:"Log out",wh:"What's happening?!",md:"Image",ef:"No posts yet. Be first!",av:"Avatar",rl:"ROLE",st:"Student",tc:"Teacher",geo:"Region & school",ct:"COUNTRY",rgn:"REGION",sc:"SCHOOL",kl:"CLASS",c1:"Select country",c2:"Select region",c4:"Select school",c5:"Select class",bd:"BIRTHDAY",hd:"Hide",ht:"HEART",hA:"Available",hC:"Complicated",hL:"Locked",hP:"Private",sv:"Save",svd:"Saved!",ac:"Account security",aU:"New username",aC:"Current password",aN:"New password",up:"Update",chs:"Chats",nc:"+ New",slc:"Select a chat",mp:"Type a message...",nch:"No chats",pu:"Enter username:",np:"New announcement...",pb:"Publish",nn:"No news",bd2:"Grant/revoke news rights",gr:"Toggle rights",ed:"Edit",dl:"Delete",fl:"Follow",uf:"Unfollow",sm:"Message",hdn:"Hidden",rp:"Write a reply...",snd:"Send",fc:"Be first to comment",cn:"cancel",cd:"Really delete?",ep:"New text:",rpl:"Reply",nnt:"No notifications",l1:"liked your post",l2:"commented",l3:"sent a message",l4:"new announcement",cN:"Name",cT:"Title",cB:"Bio",addCeo:"Add new CEO",today:"Today",yesterday:"Yesterday",editedTag:"(edited)",editingMsg:"Editing message...",vS:"Search",srchPh:"Search users...",nosr:"No users found",noCard:"Card not set yet",supTitle:"Support",supEdit:"Edit",ul:"Share",shCopied:"Link copied!",settings:"Settings",trophy:"Trophy Cabinet",noTr:"No certificates yet",univ:"Which university are you applying to?",univPh:"e.g. TATU, INHA, National University...",lang:"LANGUAGE",followers:"Followers",following:"Following",noFol:"No one here yet",myPosts:"Posts",noMyPosts:"No posts",verified:"Verified",addCert:"Grant certificate",certTitle:"Certificate title",certUser:"@username",certImg:"Attach image",certAdd:"Grant",closeX:"Close",support:"Support"},
+ru:{slogan:"Школьная соцсеть",tag:"Раскрась школу своими мыслями!",lg:"Войти",rg:"Регистрация",na:"Нет аккаунта?",ha:"Есть аккаунт?",un:"Имя пользователя",pw:"Пароль",fn:"Полное имя",uT:"Занято",uF:"Свободно",v1:"Chalking",v2:"Новости",v3:"Профиль",v4:"Чат",v5:"Уведомления",v6:"Язык",v7:"CEO",out:"Выйти",wh:"Что нового?!",md:"Фото",ef:"Постов нет. Будьте первым!",av:"Аватар",rl:"СТАТУС",st:"Ученик",tc:"Учитель",geo:"Регион и школа",ct:"СТРАНА",rgn:"ОБЛАСТЬ",sc:"ШКОЛА",kl:"КЛАСС",c1:"Выберите страну",c2:"Выберите область",c4:"Выберите школу",c5:"Выберите класс",bd:"ДЕНЬ РОЖДЕНИЯ",hd:"Скрыть",ht:"СЕРДЦЕ",hA:"Свободен(а)",hC:"Всё сложно",hL:"Занят(а)",hP:"Секрет",sv:"Сохранить",svd:"Сохранено!",ac:"Безопасность",aU:"Новый username",aC:"Текущий пароль",aN:"Новый пароль",up:"Обновить",chs:"Чаты",nc:"+ Новый",slc:"Выберите чат",mp:"Сообщение...",nch:"Чатов нет",pu:"Введите username:",np:"Новое объявление...",pb:"Опубликовать",nn:"Новостей нет",bd2:"Право на новости",gr:"Переключить право",ed:"Изменить",dl:"Удалить",fl:"Подписаться",uf:"Отписаться",sm:"Написать",hdn:"Скрыто",rp:"Ответ...",snd:"Отправить",cn:"отмена",fc:"Будьте первым",cd:"Точно удалить?",ep:"Новый текст:",rpl:"Ответить",nnt:"Уведомлений нет",l1:"понравился ваш пост",l2:"комментировал",l3:"отправил сообщение",l4:"новое объявление",cN:"Имя",cT:"Должность",cB:"Био",addCeo:"Добавить нового CEO",today:"Сегодня",yesterday:"Вчера",editedTag:"(изменено)",editingMsg:"Редактирование сообщения...",vS:"Поиск",srchPh:"Поиск пользователей...",nosr:"Никто не найден",noCard:"Карта ещё не указана",supTitle:"Поддержка",supEdit:"Изменить",ul:"Поделиться",shCopied:"Ссылка скопирована!",settings:"Настройки",trophy:"Трофеи",noTr:"Сертификатов пока нет",univ:"В какой университет вы поступаете?",univPh:"напр. TATU, INHA, Национальный университет...",lang:"ЯЗЫК",followers:"Подписчики",following:"Подписки",noFol:"Пока никого нет",myPosts:"Посты",noMyPosts:"Постов нет",verified:"Подтверждено",addCert:"Выдать сертификат",certTitle:"Название сертификата",certUser:"@username",certImg:"Прикрепить фото",certAdd:"Выдать",closeX:"Закрыть",support:"Поддержка"}};
 function t(k){return (TR[LANG]&&TR[LANG][k])||TR.uz[k]||k}
 
 var HO='<svg class="w-5 h-5 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
@@ -503,7 +516,15 @@ function hd(i){$(i).classList.add("hide")}
 function esc(s){var d=document.createElement("div");d.textContent=s||"";return d.innerHTML}
 function ava(a){return a||"https://api.dicebear.com/7.x/thumbs/svg?seed=chalker"}
 function bdg(u,c){if(u==="boss")return " "+CK+CR;if(c===1)return " "+CK;return ""}
-function lm(h){return h.replace(/@([a-z0-9_.]+)/gi,function(m,u){return '<span class="mention" onclick="openProfile(\''+u.toLowerCase()+'\')">@'+u+'</span>'})}
+function lm(h){h=h.replace(/@([a-z0-9_.]+)/gi,function(m,u){return '<span class="mention" onclick="openProfile(\''+u.toLowerCase()+'\')">@'+u+'</span>'});
+ return h.replace(/(^|[\s(])#([\w\u0400-\u04FF]+)/g,function(m,pre,tag){return pre+'<span class="text-sky-500 font-semibold">#'+tag+'</span>'})}
+function relTime(ts){if(!ts)return"";
+ var d=new Date((ts||"").replace(" ","T"));if(isNaN(d))return(ts||"").slice(0,16).replace("T"," ");
+ var now=new Date(),hh=String(d.getHours()).padStart(2,"0"),mm=String(d.getMinutes()).padStart(2,"0");
+ if(d.toDateString()===now.toDateString())return t("today")+", "+hh+":"+mm;
+ var y=new Date(now);y.setDate(now.getDate()-1);
+ if(d.toDateString()===y.toDateString())return t("yesterday")+", "+hh+":"+mm;
+ return d.toLocaleDateString()+", "+hh+":"+mm}
 async function api(p,o){var r=await fetch(API+p,o);var d;try{d=await r.json()}catch(e){d={}}
  if(!r.ok)throw new Error(d.error||d.detail||("Server error ("+r.status+")"));return d}
 function pj(o){return{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(o)}}
@@ -575,28 +596,35 @@ async function loadFeed(){try{
 function lkH(p){return (p.my_status===1?HF:HO)+' '+p.likes_count}
 function rPost(p){
  var m="";
- if(p.media_base64&&p.media_type==="video")m='<video src="'+p.media_base64+'" controls preload="none" class="mt-2 rounded-2xl border brd max-h-96 w-full"></video>';
- else if(p.media_base64)m='<img src="'+p.media_base64+'" loading="lazy" data-lb onclick="openLightbox(this.src)" class="mt-2 rounded-2xl border brd w-full max-h-96 object-contain bg-black/20">';
- var own=p.user_id===me.id?' <span class="text-xs text-gray-500"><span class="cursor-pointer hover:text-sky-500" onclick="edPost('+p.id+')">'+t("ed")+'</span> · <span class="cursor-pointer hover:text-red-400" onclick="dlPost('+p.id+')">'+t("dl")+'</span></span>':"";
- return '<div class="pc border-b brd p-3 sm:p-4 anim"><div class="flex gap-2.5 sm:gap-3">'+
- '<img src="'+ava(p.avatar_base64)+'" onclick="openProfile(\''+p.username+'\')" class="w-9 h-9 sm:w-11 sm:h-11 rounded-full object-cover cursor-pointer bg-neutral-800 shrink-0">'+
- '<div class="flex-1 min-w-0"><div class="flex items-center gap-1.5 sm:gap-2 flex-wrap text-[13px] sm:text-base">'+
- '<span class="font-bold cursor-pointer hover:underline" onclick="openProfile(\''+p.username+'\')">'+esc(p.fullname)+bdg(p.username,p.can_post_news)+'</span>'+
- '<span class="text-gray-500 text-xs sm:text-sm">@'+p.username+'</span><span class="text-gray-600 text-[10px] sm:text-xs">'+(p.timestamp||"").slice(0,16).replace("T"," ")+'</span>'+own+'</div>'+
- '<p id="pt-'+p.id+'" class="mt-1 text-[14px] sm:text-[15px] whitespace-pre-wrap break-words">'+lm(esc(p.content))+'</p>'+m+
- '<div class="flex gap-3 mt-3 text-sm items-center">'+
- '<button id="lk-'+p.id+'" onclick="react('+p.id+')" class="stk stk-like'+(p.my_status===1?' on':'')+'">'+lkH(p)+'</button>'+
- '<button onclick="tglC('+p.id+')" class="stk stk-cm">\u{1F4AC} '+p.comments_count+'</button></div>'+
+ if(p.media_base64&&p.media_type==="video")m='<video src="'+p.media_base64+'" controls preload="none" class="mt-2.5 rounded-2xl border brd max-h-96 w-full"></video>';
+ else if(p.media_base64)m='<img src="'+p.media_base64+'" loading="lazy" data-lb onclick="openLightbox(this.src)" class="mt-2.5 rounded-2xl border brd w-full max-h-96 object-contain bg-black/20">';
+ var own=p.user_id===me.id?' <span class="text-[11px] text-gray-600"><span class="cursor-pointer hover:text-sky-500" onclick="edPost('+p.id+')">'+t("ed")+'</span> · <span class="cursor-pointer hover:text-red-400" onclick="dlPost('+p.id+')">'+t("dl")+'</span></span>':"";
+ return '<div class="pc border-b brd px-3.5 py-3.5 sm:px-4 sm:py-4 anim"><div class="flex gap-2.5 sm:gap-3">'+
+ '<img src="'+ava(p.avatar_base64)+'" onclick="openProfile(\''+p.username+'\')" class="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover cursor-pointer bg-neutral-800 shrink-0">'+
+ '<div class="flex-1 min-w-0">'+
+ '<div class="flex items-center justify-between gap-2">'+
+ '<div class="flex items-center gap-1.5 flex-wrap min-w-0 text-[13px] sm:text-sm">'+
+ '<span class="font-bold cursor-pointer hover:underline truncate" onclick="openProfile(\''+p.username+'\')">'+esc(p.fullname)+bdg(p.username,p.can_post_news)+'</span>'+
+ '<span class="text-gray-600 text-[11px] sm:text-xs shrink-0">· '+relTime(p.timestamp)+'</span></div>'+own+'</div>'+
+ '<p id="pt-'+p.id+'" class="mt-1.5 text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words">'+lm(esc(p.content))+'</p>'+m+
+ '<div class="flex items-center gap-1 -ml-2 mt-2">'+
+ '<button id="lk-'+p.id+'" onclick="react('+p.id+')" class="pAct'+(p.my_status===1?' on':'')+'">'+lkH(p)+'</button>'+
+ '<button onclick="tglC('+p.id+')" class="pAct"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> '+p.comments_count+'</button>'+
+ '<button onclick="sharePost('+p.id+')" class="pAct"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg> '+t("ul")+'</button></div>'+
  '<div id="cm-'+p.id+'" class="hide mt-3 border-t brd pt-3"><div id="cl-'+p.id+'" class="space-y-3 mb-3"></div>'+
  '<div id="rh-'+p.id+'" class="hide text-xs text-sky-500 mb-1"></div><div class="flex gap-2">'+
  '<input id="ci-'+p.id+'" placeholder="'+t("rp")+'" onkeydown="if(event.key===\'Enter\')sendCmt('+p.id+')" class="flex-1 bg-neutral-900 border brd rounded-full px-4 py-2 text-sm">'+
  '<button onclick="sendCmt('+p.id+')" class="bb text-white text-sm font-bold rounded-full px-4">'+t("snd")+'</button></div></div></div></div></div>'}
+function sharePost(id){var url=window.location.origin+"/?post="+id;
+ if(navigator.share){navigator.share({title:"Chalker",url:url}).catch(function(){})}
+ else if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){alert(t("shCopied"))})}
+ else alert(url)}
 function openLightbox(src){var lb=$("lightbox");$("lbImg").src=src;lb.classList.remove("hide")}
 function closeLightbox(){$("lightbox").classList.add("hide");$("lbImg").src=""}
 async function react(id){try{
  var d=await api("/posts/like",pj({user_id:me.id,post_id:id,is_like:1}));var p=pCache[id];
  if(d.liked){p.my_status=1;p.likes_count++}else{p.my_status=null;p.likes_count--}
- var b=$("lk-"+id);b.innerHTML=lkH(p);b.className="stk stk-like"+(p.my_status===1?' on':'')
+ var b=$("lk-"+id);b.innerHTML=lkH(p);b.className="pAct"+(p.my_status===1?' on':'')
 }catch(e){alert(e.message)}}
 async function edPost(id){var n=prompt(t("ep"),pCache[id].content);if(n===null)return;
  try{await api("/posts/update",pj({user_id:me.id,post_id:id,content:n}));pCache[id].content=n;$("pt-"+id).innerHTML=lm(esc(n))}catch(e){alert(e.message)}}
@@ -618,9 +646,10 @@ function pickMedia(inp){var f=inp.files[0];if(!f)return;
  if(f.type.indexOf("image")!==0){alert("Faqat rasm yuklash mumkin!");inp.value="";return}
  cmpImg(f,function(d){mB64=d;mType="image";sh("mBox");$("mImg").src=d;sh("mImg");hd("mVid")})}
 function clrMedia(){mB64=null;mType=null;$("mInp").value="";hd("mBox");hd("mImg");hd("mVid")}
+function autoGrow(el){el.style.height="auto";el.style.height=Math.min(el.scrollHeight,320)+"px"}
 async function createPost(){var c=$("pTxt").value.trim();if(!c&&!mB64)return;
  try{await api("/posts/create",pj({user_id:me.id,content:c,media_base64:mB64,media_type:mType}));
-  $("pTxt").value="";clrMedia();loadFeed()}catch(e){alert(e.message)}}
+  $("pTxt").value="";$("pTxt").style.height="";clrMedia();loadFeed()}catch(e){alert(e.message)}}
 
 /* COMMENTS */
 function tglC(id){var b=$("cm-"+id);if(b.classList.contains("hide")){b.classList.remove("hide");oC[id]=true;loadCmts(id)}else{b.classList.add("hide");oC[id]=false}}
@@ -654,7 +683,7 @@ function fillSel(s,items,cur,ph){var h='<option value="">'+ph+'</option>';items.
 function onRg(){fillSel($("pSc"),$("pRg").value?schools():[],"",t("c4"));fillSel($("pKl"),[],"",t("c5"))}
 function onSc(){fillSel($("pKl"),classesFor($("pSc").value),"",t("c5"))}
 function openSettings(){
- $("pFn").value=me.fullname||"";$("pBio").value=me.bio||"";$("pBd").value=me.birth_date||"";
+ $("pFn").value=me.fullname||"";$("pBio").value=me.bio||"";autoGrow($("pBio"));$("pBd").value=me.birth_date||"";
  $("pUniv").value=me.university||"";
  $("pHB").checked=me.hide_birth_date===1;$("pHt").value=me.heart_status||"Available";
  $("pRole").value=me.role||"student";$("pAv").src=ava(me.avatar_base64);avB64=null;
@@ -689,14 +718,14 @@ async function loadNews(){try{
  ns.forEach(function(n){nCache[n.id]=n;
   var mine=(n.author===me.username)||(me.username==="boss");
   var own=mine?' <span class="text-xs text-gray-500"><span class="cursor-pointer hover:text-sky-500" onclick="edNews('+n.id+')">'+t("ed")+'</span> · <span class="cursor-pointer hover:text-red-400" onclick="dlNews('+n.id+')">'+t("dl")+'</span></span>':"";
-  h+='<div class="pc border-b brd p-3 sm:p-4 anim"><div class="flex items-center gap-1.5 sm:gap-2 flex-wrap text-[13px] sm:text-base">'+
+  h+='<div class="pc border-b brd px-3.5 py-3.5 sm:px-4 sm:py-4 anim"><div class="flex items-center gap-1.5 sm:gap-2 flex-wrap text-[13px] sm:text-sm">'+
   '<span class="font-bold">\u{1F4E2} '+t("v2")+'</span>'+
   (n.author?'<span class="mention" onclick="openProfile(\''+n.author+'\')">@'+n.author+'</span>':'')+
-  '<span class="text-gray-600 text-[10px] sm:text-xs">'+(n.timestamp||"").slice(0,16).replace("T"," ")+'</span>'+own+'</div>'+
-  '<p id="nt-'+n.id+'" class="mt-1 text-[14px] sm:text-[15px] whitespace-pre-wrap break-words">'+lm(esc(n.title))+'</p>'+
-  '<div class="flex gap-3 mt-3 text-sm items-center">'+
-  '<button id="nlk-'+n.id+'" onclick="nReact('+n.id+')" class="stk stk-like'+(n.my_like?' on':'')+'">'+nlkH(n)+'</button>'+
-  '<button onclick="tglNC('+n.id+')" class="stk stk-cm">\u{1F4AC} '+n.comments_count+'</button></div>'+
+  '<span class="text-gray-600 text-[11px] sm:text-xs">· '+relTime(n.timestamp)+'</span>'+own+'</div>'+
+  '<p id="nt-'+n.id+'" class="mt-1.5 text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words">'+lm(esc(n.title))+'</p>'+
+  '<div class="flex items-center gap-1 -ml-2 mt-2">'+
+  '<button id="nlk-'+n.id+'" onclick="nReact('+n.id+')" class="pAct'+(n.my_like?' on':'')+'">'+nlkH(n)+'</button>'+
+  '<button onclick="tglNC('+n.id+')" class="pAct"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> '+n.comments_count+'</button></div>'+
   '<div id="ncm-'+n.id+'" class="hide mt-3 border-t brd pt-3"><div id="ncl-'+n.id+'" class="space-y-3 mb-3"></div><div class="flex gap-2">'+
   '<input id="nci-'+n.id+'" placeholder="'+t("rp")+'" onkeydown="if(event.key===\'Enter\')sendNCmt('+n.id+')" class="flex-1 bg-neutral-900 border brd rounded-full px-4 py-2 text-sm">'+
   '<button onclick="sendNCmt('+n.id+')" class="bb text-white text-sm font-bold rounded-full px-4">'+t("snd")+'</button></div></div></div>'});
@@ -706,7 +735,7 @@ async function loadNews(){try{
 async function nReact(id){try{
  var d=await api("/news/like",pj({user_id:me.id,news_id:id}));var n=nCache[id];
  if(d.liked){n.my_like=1;n.likes_count++}else{n.my_like=null;n.likes_count--}
- var b=$("nlk-"+id);b.innerHTML=nlkH(n);b.className="stk stk-like"+(n.my_like?' on':'')}catch(e){alert(e.message)}}
+ var b=$("nlk-"+id);b.innerHTML=nlkH(n);b.className="pAct"+(n.my_like?' on':'')}catch(e){alert(e.message)}}
 function tglNC(id){var b=$("ncm-"+id);if(b.classList.contains("hide")){b.classList.remove("hide");oNC[id]=true;loadNCmts(id)}else{b.classList.add("hide");oNC[id]=false}}
 async function loadNCmts(id){try{var l=await api("/news/comments?news_id="+id+"&viewer_id="+me.id);var h="";
  l.forEach(function(c){var canDel=(c.username===me.username||me.username==="boss");
@@ -822,10 +851,14 @@ async function loadProfilePage(u,isSelf){try{
  $("vpAv").src=ava(d.avatar_base64);
  $("vpName").innerHTML=esc(d.fullname||d.username)+bdg(d.username,d.can_post_news);
  $("vpUn").textContent="@"+d.username;
- $("vpRole").textContent=d.role==="teacher"?t("tc"):t("st");
- $("vpHeart").textContent="  \u2764\uFE0F "+t("h"+(d.heart_status||"Available").charAt(0));
- var meta=[];if(d.region)meta.push(d.region);if(d.school_name)meta.push(d.school_name);if(d.school_class)meta.push(d.school_class);
- $("vpMeta").textContent=meta.join(" · ");
+ var role=d.role==="teacher"?t("tc"):t("st");
+ var heart=t("h"+(d.heart_status||"Available").charAt(0));
+ var chips=['<span class="infoChip">'+role+'</span>'];
+ chips.push('<span class="infoChip"><span class="lbl">'+t("ht")+'</span>: \u2764\uFE0F <b>'+heart+'</b></span>');
+ if(d.school_class)chips.push('<span class="infoChip"><span class="lbl">'+t("kl")+'</span>: <b>'+esc(d.school_class)+'</b></span>');
+ if(d.school_name)chips.push('<span class="infoChip"><span class="lbl">'+t("sc")+'</span>: <b>'+esc(d.school_name)+'</b></span>');
+ if(d.region)chips.push('<span class="infoChip"><span class="lbl">'+t("rgn")+'</span>: <b>'+esc(d.region)+'</b></span>');
+ $("vpInfo").innerHTML=chips.join('<span class="infoDot">&middot;</span>');
  $("vpBio").textContent=d.bio?'"'+d.bio+'"':"";
  $("vpUniv").textContent=d.university?"\u{1F393} "+d.university:"";
  $("vpFw").textContent=d.followers;$("vpFg").textContent=d.following;
