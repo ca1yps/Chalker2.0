@@ -85,8 +85,6 @@ def init():
         "CREATE UNIQUE INDEX IF NOT EXISTS iun ON news_likes(user_id, news_id)",
         """CREATE TABLE IF NOT EXISTS news_comments(id SERIAL PRIMARY KEY, news_id INTEGER NOT NULL,
           user_id INTEGER NOT NULL, content TEXT NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
-        """CREATE TABLE IF NOT EXISTS support_info(id INTEGER PRIMARY KEY, card_type TEXT DEFAULT 'Humo',
-          card_number TEXT DEFAULT '', card_holder TEXT DEFAULT '')""",
         """CREATE TABLE IF NOT EXISTS comment_likes(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
           comment_id INTEGER NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
         "CREATE UNIQUE INDEX IF NOT EXISTS iucl ON comment_likes(user_id, comment_id)",
@@ -112,9 +110,6 @@ def init():
                 c._conn.rollback()
             except Exception:
                 pass
-    if not c.execute("SELECT id FROM support_info WHERE id=1").fetchone():
-        c.execute("INSERT INTO support_info(id,card_type,card_number,card_holder) VALUES(1,?,?,?)",
-                  ("Humo", "", ""))
     c.commit(); c.close()
 
 
@@ -156,8 +151,6 @@ class NewsComment(BaseModel):
     user_id: int; news_id: int; content: str
 class RightsReq(BaseModel):
     boss_id: int; target_username: str
-class SupportUpd(BaseModel):
-    user_id: int; card_type: str; card_number: str = ""; card_holder: str = ""
 class CommentDel(BaseModel):
     user_id: int; comment_id: int
 class NewsCommentDel(BaseModel):
@@ -442,20 +435,6 @@ def search(q: str = "", viewer_id: Optional[int] = None):
         (v, like, like, q + "%")).fetchall()
     c.close()
     return [{**dict(r), "is_following": bool(r["is_following"])} for r in rows]
-
-@app.get("/api/support")
-def support_get():
-    c = db()
-    r = c.execute("SELECT card_type,card_number,card_holder FROM support_info WHERE id=1").fetchone()
-    c.close(); return dict(r) if r else {"card_type": "Humo", "card_number": "", "card_holder": ""}
-
-@app.post("/api/support/update")
-def support_update(b: SupportUpd):
-    c = db(); boss = urow(c, b.user_id)
-    if not boss or boss["username"] != "boss": c.close(); return err("Faqat @boss!", 403)
-    c.execute("UPDATE support_info SET card_type=?,card_number=?,card_holder=? WHERE id=1",
-              (b.card_type.strip(), b.card_number.strip(), b.card_holder.strip()))
-    c.commit(); c.close(); return {"success": True}
 
 @app.post("/api/users/follow")
 def follow(b: FollowReq):
