@@ -4,6 +4,12 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 <title>chalker</title>
+<meta name="description" content="Chalker — maktab ijtimoiy tarmog'i. Fikrlaring bilan maktabni bo'yab tashla!">
+<meta property="og:title" content="Chalker">
+<meta property="og:description" content="Maktab ijtimoiy tarmog'i">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23000000'/%3E%3Ctext x='50' y='68' font-family='Arial,Helvetica,sans-serif' font-weight='900' font-size='62' fill='white' text-anchor='middle'%3EC%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23000000'/%3E%3Ctext x='50' y='68' font-family='Arial,Helvetica,sans-serif' font-weight='900' font-size='62' fill='white' text-anchor='middle'%3EC%3C/text%3E%3C/svg%3E">
 <script src="https://telegram.org/js/telegram-web-app.js" onerror="this.remove()"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
@@ -91,8 +97,8 @@ select{cursor:pointer}
 .inp:focus{background:#0d0f12}
 
 .panel{background:linear-gradient(180deg,#0c0d10,#050506);box-shadow:0 12px 40px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.05);border-color:var(--brd-soft)!important}
-.nvic{width:27px;height:27px;flex:none;transition:transform .2s ease}
-.nv:hover .nvic{transform:scale(1.08)}
+.nvic{width:32px;height:32px;flex:none;transition:transform .2s ease}
+.nv:hover .nvic{transform:scale(1.1)}
 
 .lang-card{display:flex;align-items:center;gap:1rem;width:100%;border:1px solid var(--brd);border-radius:1.25rem;padding:1.1rem 1.3rem;text-align:left;font-weight:700;font-size:1.05rem;background:linear-gradient(180deg,#0c0d10,#050506);box-shadow:0 8px 26px rgba(0,0,0,.5);transition:border-color .2s ease,transform .2s ease,box-shadow .2s ease}
 .lang-card:hover{border-color:var(--sky);transform:translateY(-3px);box-shadow:0 14px 38px rgba(255,255,255,.16)}
@@ -158,18 +164,18 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
  border-top:1px solid #2f3336;
  padding-bottom:env(safe-area-inset-bottom,0px);
 }
-#bottomNavBox .bnv{position:relative;flex:1;display:flex;align-items:center;justify-content:center;padding:10px 0 8px;color:#71767b;transition:color .15s ease,transform .15s ease}
+#bottomNavBox .bnv{position:relative;flex:1;display:flex;align-items:center;justify-content:center;padding:13px 0 11px;color:#71767b;transition:color .15s ease,transform .15s ease}
 #bottomNavBox .bnv:active{transform:scale(.9)}
 #bottomNavBox .bnv.nvactive{color:#ffffff}
 #bottomNavBox .bnv.nvactive svg{filter:drop-shadow(0 0 6px rgba(255,255,255,.65))}
-#bottomNavBox .bnv svg{width:24px;height:24px}
-#bottomNavBox .bdot{position:absolute;top:6px;right:calc(50% - 14px);width:8px;height:8px;background:#f4212e;border-radius:50%;box-shadow:0 0 0 2px #050506}
+#bottomNavBox .bnv svg{width:30px;height:30px}
+#bottomNavBox .bdot{position:absolute;top:8px;right:calc(50% - 17px);width:8px;height:8px;background:#f4212e;border-radius:50%;box-shadow:0 0 0 2px #050506}
 #mobAv{transition:box-shadow .2s ease}
 #mobAv:active{box-shadow:0 0 0 3px rgba(255,255,255,.35)}
 
 /* content needs room to clear the fixed bottom bar on phones/tablets */
 @media(max-width:1023.98px){
- #appMain{padding-bottom:calc(60px + env(safe-area-inset-bottom,0px))}
+ #appMain{padding-bottom:calc(72px + env(safe-area-inset-bottom,0px))}
 }
 
 /* ---------- pro sticker style for like / comment buttons ---------- */
@@ -252,18 +258,22 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
 </div>
 
 <div id="appView" class="hide w-full flex min-h-screen">
- <aside class="hidden lg:flex lg:w-64 shrink-0 border-r brd p-2.5 lg:p-4 flex-col sticky top-0 h-screen panel transition-[width] duration-300 z-20">
+ <aside class="hidden lg:flex lg:w-80 shrink-0 border-r brd p-3 lg:p-5 flex-col sticky top-0 h-screen panel transition-[width] duration-300 z-20">
   <div id="sideLogo" class="hidden md:block text-4xl px-2"></div>
-  <p id="sideTag" class="hidden md:block text-[10px] text-gray-500 px-2 mb-4"></p>
-  <nav id="navBox" class="space-y-1 flex-1"></nav>
-  <div class="border brd rounded-2xl p-2 md:p-3 flex flex-col md:flex-row items-center gap-1.5 md:gap-2">
-   <img id="sAv" class="w-9 h-9 rounded-full object-cover bg-neutral-800 shrink-0">
-   <div class="hidden md:block flex-1 min-w-0"><p id="sNm" class="font-bold text-xs truncate"></p><p id="sUn" class="text-gray-500 text-xs truncate"></p></div>
+  <p id="sideTag" class="hidden md:block text-[10px] text-gray-500 px-2 mb-5"></p>
+  <nav id="navBox" class="space-y-2 flex-1"></nav>
+  <div class="border brd rounded-2xl p-2.5 md:p-3.5 flex flex-col md:flex-row items-center gap-1.5 md:gap-2.5">
+   <img id="sAv" class="w-10 h-10 rounded-full object-cover bg-neutral-800 shrink-0">
+   <div class="hidden md:block flex-1 min-w-0"><p id="sNm" class="font-bold text-sm truncate"></p><p id="sUn" class="text-gray-500 text-xs truncate"></p></div>
    <button id="tOut" onclick="logout()" class="text-red-400 text-[10px] md:text-xs font-bold"></button>
+  </div>
+  <div class="hidden md:block text-center text-[11px] text-white/70 leading-relaxed mt-3 px-2">
+   <p>CEO Founder - Ilyosbek Siddiqjonov</p>
+   <p>Copyright &copy; 2026 Chalker</p>
   </div>
  </aside>
 
- <main id="appMain" class="flex-1 border-r brd min-w-0">
+ <main id="appMain" class="flex-1 min-w-0">
   <div id="mobTopBar" class="border-b brd p-3 sm:p-4 md:p-5 flex items-center justify-between md:justify-center sticky top-0 z-10" style="background:rgba(0,0,0,.85);backdrop-filter:blur(10px)">
    <img id="mobAv" onclick="showView('profile')" class="lg:hidden w-8 h-8 rounded-full object-cover bg-neutral-800 cursor-pointer shrink-0">
    <div class="text-center flex-1 lg:flex-none">
@@ -306,7 +316,7 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
 
   <div id="view-profile" class="hide">
    <div class="pcover"></div>
-   <div class="p-4 sm:p-6 max-w-lg mx-auto space-y-4 anim -mt-10">
+   <div class="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-4 anim -mt-10">
     <div class="flex items-end justify-between">
      <img id="vpAv" class="w-20 h-20 rounded-full object-cover bg-neutral-800 border-4 border-black shrink-0">
      <div class="flex items-center gap-2 mb-1">
@@ -327,7 +337,7 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
      <span class="cursor-pointer hover:underline" onclick="openFollowList('followers')"><b id="vpFw">0</b> <span id="tFwLbl" class="text-gray-500"></span></span>
      <span class="cursor-pointer hover:underline" onclick="openFollowList('following')"><b id="vpFg">0</b> <span id="tFgLbl" class="text-gray-500"></span></span>
     </div>
-    <div>
+    <div id="trophyBox">
      <div class="flex items-center justify-between border-t brd pt-4 mb-2">
       <p id="tTrophy" class="text-sm font-bold text-amber-400"></p>
       <button id="addCertBtn" onclick="toggleCertForm()" class="hide text-xs font-bold text-amber-400 border border-amber-500/50 rounded-full px-3 py-1 hover:bg-amber-500/10">+ <span id="tAddCert"></span></button>
@@ -342,9 +352,21 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
      <div id="trophyGrid" class="trophyGrid"></div>
      <p id="noTrMsg" class="hide text-gray-600 text-xs"></p>
     </div>
+    <div id="bossCabinetBox" class="hide">
+     <p class="text-sm font-bold text-amber-400 border-t brd pt-4 mb-2">&#128081; <span id="tBossCab"></span></p>
+     <div class="border brd rounded-2xl p-4 space-y-2 panel">
+      <p id="tBD" class="text-xs text-gray-500 mb-1"></p>
+      <input id="gU" placeholder="@username" class="inp">
+      <button id="tGr" onclick="grantNews()" class="w-full border border-amber-500/50 text-amber-400 font-bold rounded-full py-2 text-sm hover:bg-amber-500/10"></button>
+     </div>
+    </div>
     <div>
      <p id="tMyPosts" class="text-sm font-bold text-white mb-2 border-t brd pt-4"></p>
      <div id="vpPosts"></div>
+    </div>
+    <div class="lg:hidden text-center text-[11px] text-white/70 leading-relaxed border-t brd pt-4 pb-2">
+     <p>CEO Founder - Ilyosbek Siddiqjonov</p>
+     <p>Copyright &copy; 2026 Chalker</p>
     </div>
    </div>
   </div>
@@ -359,50 +381,7 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
    <div id="srchList" class="p-2"></div>
   </div>
 
-  <div id="view-support" class="hide lg:hidden p-4 sm:p-6 max-w-lg mx-auto space-y-4 anim">
-   <div class="border brd rounded-2xl p-4 panel">
-    <h3 id="tSupportM" class="font-extrabold text-lg mb-3 tracking-tight"></h3>
-    <div id="supportShowM" class="space-y-1"></div>
-    <div id="supportEditWrapM" class="hide mt-3 pt-3 border-t brd space-y-2">
-     <select id="scTypeM" class="inp">
-      <option value="Humo">Humo</option><option value="Uzcard">Uzcard</option><option value="Visa">Visa</option>
-     </select>
-     <input id="scNumberM" placeholder="8600 0000 0000 0000" class="inp">
-     <input id="scHolderM" placeholder="IL***** S*****" class="inp">
-     <button id="tSupSaveM" onclick="saveSupport()" class="w-full bb text-white font-bold rounded-full py-2.5 text-sm"></button>
-    </div>
-    <button id="supEditBtnM" onclick="toggleSupportEdit()" class="hide mt-3 w-full border brd rounded-full py-2 text-xs font-bold hover:bg-neutral-900"></button>
-   </div>
-   <div class="text-center text-[11px] text-gray-600 leading-relaxed pb-2">
-    <p>CEO Founder - Ilyosbek Siddiqjonov</p><p>Copyright &copy; 2026 Chalker</p>
-   </div>
-  </div>
  </main>
-
- <aside class="w-72 shrink-0 p-4 sticky top-0 h-screen hidden lg:flex lg:flex-col lg:justify-between">
-  <div class="space-y-4">
-   <div class="border brd rounded-2xl p-5 panel">
-    <h3 id="tSupport" class="font-extrabold text-lg mb-3 tracking-tight"></h3>
-    <div id="supportShow" class="space-y-1"></div>
-    <div id="supportEditWrap" class="hide mt-3 pt-3 border-t brd space-y-2">
-     <select id="scType" class="inp">
-      <option value="Humo">Humo</option>
-      <option value="Uzcard">Uzcard</option>
-      <option value="Visa">Visa</option>
-     </select>
-     <input id="scNumber" placeholder="8600 0000 0000 0000" class="inp">
-     <input id="scHolder" placeholder="IL***** S*****" class="inp">
-     <button id="tSupSave" onclick="saveSupport()" class="w-full bb font-extrabold rounded-full py-2.5 text-sm"></button>
-    </div>
-    <button id="supEditBtn" onclick="toggleSupportEdit()" class="hide mt-3 w-full border brd rounded-full py-2 text-xs font-bold hover:bg-neutral-900"></button>
-   </div>
-  </div>
-
-  <div class="text-center text-[11px] text-gray-600 leading-relaxed pb-2">
-   <p>CEO Founder - Ilyosbek Siddiqjonov</p>
-   <p>Copyright &copy; 2026 Chalker</p>
-  </div>
- </aside>
 
  <nav id="bottomNavBox" class="lg:hidden fixed bottom-0 inset-x-0 z-30 flex items-stretch"></nav>
 </div>
@@ -450,12 +429,6 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
     <div class="relative"><input id="aN" type="password" class="inp pr-12"><button type="button" id="e2" onclick="tEye('aN','e2')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"></button></div>
     <button id="tAB" onclick="saveAccount()" class="w-full border border-amber-500/50 text-amber-400 font-bold rounded-full py-2.5 text-sm hover:bg-amber-500/10"></button>
    </div>
-   <div id="bossPanel" class="hide border brd rounded-2xl p-4 space-y-2 panel">
-    <h3 class="font-extrabold text-sm mb-1 text-amber-400">&#128081; Boss</h3>
-    <p id="tBD" class="text-xs text-gray-500 mb-1"></p>
-    <input id="gU" placeholder="@username" class="inp">
-    <button id="tGr" onclick="grantNews()" class="w-full border border-amber-500/50 text-amber-400 font-bold rounded-full py-2 text-sm hover:bg-amber-500/10"></button>
-   </div>
   </div>
  </div>
 </div>
@@ -495,9 +468,9 @@ var LANG=localStorage.getItem("chalker_lang")||"uz";
 window.onerror=function(m,s,l){alert("JS xato: "+m+" ("+l+")")};
 
 var TR={
-uz:{slogan:"Maktab ijtimoiy tarmog'i",tag:"Fikrlaring bilan maktabni bo'yab tashla!",lg:"Kirish",rg:"Ro'yxatdan o'tish",na:"Akkount yo'qmi?",ha:"Akkount bormi?",un:"Username",pw:"Parol",fn:"To'liq ism",uT:"Band",uF:"Bo'sh",v1:"Chalking",v2:"Yangiliklar",v3:"Profil",v4:"Chat",v5:"Bildirishnoma",v6:"Til",v7:"CEO",out:"Chiqish",wh:"Nima gaplar?!",md:"Rasm",ef:"Postlar yo'q. Birinchi bo'l!",av:"Avatar",rl:"MAQOM",st:"O'quvchi",tc:"O'qituvchi",geo:"Hudud va maktab",ct:"DAVLAT",rgn:"VILOYAT",sc:"MAKTAB",kl:"SINF",c1:"Davlatni tanlang",c2:"Viloyatni tanlang",c4:"Maktabni tanlang",c5:"Sinfni tanlang",bd:"TUG'ILGAN KUN",hd:"Yashirish",ht:"YURAK",hA:"Bo'sh",hC:"Murakkab",hL:"Band",hP:"Sir",sv:"Saqlash",svd:"Saqlandi!",ac:"Akkount xavfsizligi",aU:"Yangi username",aC:"Joriy parol",aN:"Yangi parol",up:"Yangilash",chs:"Chatlar",nc:"+ Yangi",slc:"Suhbatni tanlang",mp:"Xabar yozing...",nch:"Suhbatlar yo'q",pu:"Username kiriting:",np:"Yangi e'lon...",pb:"E'lon qilish",nn:"Yangiliklar yo'q",bd2:"Yangilik huquqini berish/olish",gr:"Huquqni almashtirish",ed:"Tahrirlash",dl:"O'chirish",fl:"Follow",uf:"Unfollow",sm:"Xabar yozish",hdn:"Yashirin",rp:"Javob yozing...",snd:"Yuborish",fc:"Birinchi komment yoz",cn:"bekor",cd:"Rostdan o'chirasizmi?",ep:"Yangi matn:",rpl:"Javob",nnt:"Bildirishnomalar yo'q",l1:"yurakcha bosdi",l2:"komment yozdi",l3:"xabar yubordi",l4:"yangi e'lon",cN:"Ism",cT:"Lavozim",cB:"Bio",addCeo:"Yangi CEO qo'shish",today:"Bugun",yesterday:"Kecha",editedTag:"(tahrirlangan)",editingMsg:"Xabar tahrirlanmoqda...",vS:"Qidiruv",srchPh:"Foydalanuvchi qidirish...",nosr:"Hech kim topilmadi",noCard:"Karta hali kiritilmagan",supTitle:"Homiylik",supEdit:"Tahrirlash",ul:"Ulashish",shCopied:"Havola nusxalandi!",loading:"Yuklanmoqda",settings:"Sozlamalar",trophy:"Trophy Cabinet",noTr:"Sertifikatlar hali yo'q",univ:"Qaysi oliygohga topshiryapsiz?",univPh:"Masalan: TATU, INHA, Milliy universitet...",lang:"TIL",followers:"Obunachilar",following:"Obunalar",noFol:"Hozircha hech kim yo'q",myPosts:"Postlari",noMyPosts:"Postlar yo'q",verified:"Tasdiqlangan",addCert:"Sertifikat berish",certTitle:"Sertifikat nomi",certUser:"@username",certImg:"Rasm biriktirish",certAdd:"Berish",closeX:"Yopish",support:"Homiylik"},
-en:{slogan:"School social network",tag:"Chalk up your school with your thoughts!",lg:"Log in",rg:"Sign up",na:"No account?",ha:"Have an account?",un:"Username",pw:"Password",fn:"Full name",uT:"Taken",uF:"Available",v1:"Chalking",v2:"News",v3:"Profile",v4:"Chat",v5:"Notifications",v6:"Language",v7:"CEO",out:"Log out",wh:"What's happening?!",md:"Image",ef:"No posts yet. Be first!",av:"Avatar",rl:"ROLE",st:"Student",tc:"Teacher",geo:"Region & school",ct:"COUNTRY",rgn:"REGION",sc:"SCHOOL",kl:"CLASS",c1:"Select country",c2:"Select region",c4:"Select school",c5:"Select class",bd:"BIRTHDAY",hd:"Hide",ht:"HEART",hA:"Available",hC:"Complicated",hL:"Locked",hP:"Private",sv:"Save",svd:"Saved!",ac:"Account security",aU:"New username",aC:"Current password",aN:"New password",up:"Update",chs:"Chats",nc:"+ New",slc:"Select a chat",mp:"Type a message...",nch:"No chats",pu:"Enter username:",np:"New announcement...",pb:"Publish",nn:"No news",bd2:"Grant/revoke news rights",gr:"Toggle rights",ed:"Edit",dl:"Delete",fl:"Follow",uf:"Unfollow",sm:"Message",hdn:"Hidden",rp:"Write a reply...",snd:"Send",fc:"Be first to comment",cn:"cancel",cd:"Really delete?",ep:"New text:",rpl:"Reply",nnt:"No notifications",l1:"liked your post",l2:"commented",l3:"sent a message",l4:"new announcement",cN:"Name",cT:"Title",cB:"Bio",addCeo:"Add new CEO",today:"Today",yesterday:"Yesterday",editedTag:"(edited)",editingMsg:"Editing message...",vS:"Search",srchPh:"Search users...",nosr:"No users found",noCard:"Card not set yet",supTitle:"Support",supEdit:"Edit",ul:"Share",shCopied:"Link copied!",loading:"Loading",settings:"Settings",trophy:"Trophy Cabinet",noTr:"No certificates yet",univ:"Which university are you applying to?",univPh:"e.g. TATU, INHA, National University...",lang:"LANGUAGE",followers:"Followers",following:"Following",noFol:"No one here yet",myPosts:"Posts",noMyPosts:"No posts",verified:"Verified",addCert:"Grant certificate",certTitle:"Certificate title",certUser:"@username",certImg:"Attach image",certAdd:"Grant",closeX:"Close",support:"Support"},
-ru:{slogan:"Школьная соцсеть",tag:"Раскрась школу своими мыслями!",lg:"Войти",rg:"Регистрация",na:"Нет аккаунта?",ha:"Есть аккаунт?",un:"Имя пользователя",pw:"Пароль",fn:"Полное имя",uT:"Занято",uF:"Свободно",v1:"Chalking",v2:"Новости",v3:"Профиль",v4:"Чат",v5:"Уведомления",v6:"Язык",v7:"CEO",out:"Выйти",wh:"Что нового?!",md:"Фото",ef:"Постов нет. Будьте первым!",av:"Аватар",rl:"СТАТУС",st:"Ученик",tc:"Учитель",geo:"Регион и школа",ct:"СТРАНА",rgn:"ОБЛАСТЬ",sc:"ШКОЛА",kl:"КЛАСС",c1:"Выберите страну",c2:"Выберите область",c4:"Выберите школу",c5:"Выберите класс",bd:"ДЕНЬ РОЖДЕНИЯ",hd:"Скрыть",ht:"СЕРДЦЕ",hA:"Свободен(а)",hC:"Всё сложно",hL:"Занят(а)",hP:"Секрет",sv:"Сохранить",svd:"Сохранено!",ac:"Безопасность",aU:"Новый username",aC:"Текущий пароль",aN:"Новый пароль",up:"Обновить",chs:"Чаты",nc:"+ Новый",slc:"Выберите чат",mp:"Сообщение...",nch:"Чатов нет",pu:"Введите username:",np:"Новое объявление...",pb:"Опубликовать",nn:"Новостей нет",bd2:"Право на новости",gr:"Переключить право",ed:"Изменить",dl:"Удалить",fl:"Подписаться",uf:"Отписаться",sm:"Написать",hdn:"Скрыто",rp:"Ответ...",snd:"Отправить",cn:"отмена",fc:"Будьте первым",cd:"Точно удалить?",ep:"Новый текст:",rpl:"Ответить",nnt:"Уведомлений нет",l1:"понравился ваш пост",l2:"комментировал",l3:"отправил сообщение",l4:"новое объявление",cN:"Имя",cT:"Должность",cB:"Био",addCeo:"Добавить нового CEO",today:"Сегодня",yesterday:"Вчера",editedTag:"(изменено)",editingMsg:"Редактирование сообщения...",vS:"Поиск",srchPh:"Поиск пользователей...",nosr:"Никто не найден",noCard:"Карта ещё не указана",supTitle:"Поддержка",supEdit:"Изменить",ul:"Поделиться",shCopied:"Ссылка скопирована!",loading:"Загрузка",settings:"Настройки",trophy:"Трофеи",noTr:"Сертификатов пока нет",univ:"В какой университет вы поступаете?",univPh:"напр. TATU, INHA, Национальный университет...",lang:"ЯЗЫК",followers:"Подписчики",following:"Подписки",noFol:"Пока никого нет",myPosts:"Посты",noMyPosts:"Постов нет",verified:"Подтверждено",addCert:"Выдать сертификат",certTitle:"Название сертификата",certUser:"@username",certImg:"Прикрепить фото",certAdd:"Выдать",closeX:"Закрыть",support:"Поддержка"}};
+uz:{slogan:"Maktab ijtimoiy tarmog'i",tag:"Fikrlaring bilan maktabni bo'yab tashla!",lg:"Kirish",rg:"Ro'yxatdan o'tish",na:"Akkount yo'qmi?",ha:"Akkount bormi?",un:"Username",pw:"Parol",fn:"To'liq ism",uT:"Band",uF:"Bo'sh",v1:"Chalking",v2:"Yangiliklar",v3:"Profil",v4:"Chat",v5:"Bildirishnoma",v6:"Til",v7:"CEO",out:"Chiqish",wh:"Nima gaplar?!",md:"Rasm",ef:"Postlar yo'q. Birinchi bo'l!",av:"Avatar",rl:"MAQOM",st:"O'quvchi",tc:"O'qituvchi",geo:"Hudud va maktab",ct:"DAVLAT",rgn:"VILOYAT",sc:"MAKTAB",kl:"SINF",c1:"Davlatni tanlang",c2:"Viloyatni tanlang",c4:"Maktabni tanlang",c5:"Sinfni tanlang",bd:"TUG'ILGAN KUN",hd:"Yashirish",ht:"YURAK",hA:"Bo'sh",hC:"Murakkab",hL:"Band",hP:"Sir",sv:"Saqlash",svd:"Saqlandi!",ac:"Akkount xavfsizligi",aU:"Yangi username",aC:"Joriy parol",aN:"Yangi parol",up:"Yangilash",chs:"Chatlar",nc:"+ Yangi",slc:"Suhbatni tanlang",mp:"Xabar yozing...",nch:"Suhbatlar yo'q",pu:"Username kiriting:",np:"Yangi e'lon...",pb:"E'lon qilish",nn:"Yangiliklar yo'q",bd2:"Yangilik huquqini berish/olish",gr:"Huquqni almashtirish",ed:"Tahrirlash",dl:"O'chirish",fl:"Follow",uf:"Unfollow",sm:"Xabar yozish",hdn:"Yashirin",rp:"Javob yozing...",snd:"Yuborish",fc:"Birinchi komment yoz",cn:"bekor",cd:"Rostdan o'chirasizmi?",ep:"Yangi matn:",rpl:"Javob",nnt:"Bildirishnomalar yo'q",l1:"yurakcha bosdi",l2:"komment yozdi",l3:"xabar yubordi",l4:"yangi e'lon",cN:"Ism",cT:"Lavozim",cB:"Bio",addCeo:"Yangi CEO qo'shish",today:"Bugun",yesterday:"Kecha",editedTag:"(tahrirlangan)",editingMsg:"Xabar tahrirlanmoqda...",vS:"Qidiruv",srchPh:"Foydalanuvchi qidirish...",nosr:"Hech kim topilmadi",noCard:"Karta hali kiritilmagan",supTitle:"Homiylik",supEdit:"Tahrirlash",ul:"Ulashish",shCopied:"Havola nusxalandi!",loading:"Yuklanmoqda",settings:"Sozlamalar",trophy:"Trophy Cabinet",noTr:"Sertifikatlar hali yo'q",univ:"Qaysi oliygohga topshiryapsiz?",univPh:"Masalan: TATU, INHA, Milliy universitet...",lang:"TIL",followers:"Obunachilar",following:"Obunalar",noFol:"Hozircha hech kim yo'q",myPosts:"Postlari",noMyPosts:"Postlar yo'q",verified:"Tasdiqlangan",addCert:"Sertifikat berish",certTitle:"Sertifikat nomi",certUser:"@username",certImg:"Rasm biriktirish",certAdd:"Berish",closeX:"Yopish",support:"Homiylik",bossCab:"Boss Cabinet"},
+en:{slogan:"School social network",tag:"Chalk up your school with your thoughts!",lg:"Log in",rg:"Sign up",na:"No account?",ha:"Have an account?",un:"Username",pw:"Password",fn:"Full name",uT:"Taken",uF:"Available",v1:"Chalking",v2:"News",v3:"Profile",v4:"Chat",v5:"Notifications",v6:"Language",v7:"CEO",out:"Log out",wh:"What's happening?!",md:"Image",ef:"No posts yet. Be first!",av:"Avatar",rl:"ROLE",st:"Student",tc:"Teacher",geo:"Region & school",ct:"COUNTRY",rgn:"REGION",sc:"SCHOOL",kl:"CLASS",c1:"Select country",c2:"Select region",c4:"Select school",c5:"Select class",bd:"BIRTHDAY",hd:"Hide",ht:"HEART",hA:"Available",hC:"Complicated",hL:"Locked",hP:"Private",sv:"Save",svd:"Saved!",ac:"Account security",aU:"New username",aC:"Current password",aN:"New password",up:"Update",chs:"Chats",nc:"+ New",slc:"Select a chat",mp:"Type a message...",nch:"No chats",pu:"Enter username:",np:"New announcement...",pb:"Publish",nn:"No news",bd2:"Grant/revoke news rights",gr:"Toggle rights",ed:"Edit",dl:"Delete",fl:"Follow",uf:"Unfollow",sm:"Message",hdn:"Hidden",rp:"Write a reply...",snd:"Send",fc:"Be first to comment",cn:"cancel",cd:"Really delete?",ep:"New text:",rpl:"Reply",nnt:"No notifications",l1:"liked your post",l2:"commented",l3:"sent a message",l4:"new announcement",cN:"Name",cT:"Title",cB:"Bio",addCeo:"Add new CEO",today:"Today",yesterday:"Yesterday",editedTag:"(edited)",editingMsg:"Editing message...",vS:"Search",srchPh:"Search users...",nosr:"No users found",noCard:"Card not set yet",supTitle:"Support",supEdit:"Edit",ul:"Share",shCopied:"Link copied!",loading:"Loading",settings:"Settings",trophy:"Trophy Cabinet",noTr:"No certificates yet",univ:"Which university are you applying to?",univPh:"e.g. TATU, INHA, National University...",lang:"LANGUAGE",followers:"Followers",following:"Following",noFol:"No one here yet",myPosts:"Posts",noMyPosts:"No posts",verified:"Verified",addCert:"Grant certificate",certTitle:"Certificate title",certUser:"@username",certImg:"Attach image",certAdd:"Grant",closeX:"Close",support:"Support",bossCab:"Boss Cabinet"},
+ru:{slogan:"Школьная соцсеть",tag:"Раскрась школу своими мыслями!",lg:"Войти",rg:"Регистрация",na:"Нет аккаунта?",ha:"Есть аккаунт?",un:"Имя пользователя",pw:"Пароль",fn:"Полное имя",uT:"Занято",uF:"Свободно",v1:"Chalking",v2:"Новости",v3:"Профиль",v4:"Чат",v5:"Уведомления",v6:"Язык",v7:"CEO",out:"Выйти",wh:"Что нового?!",md:"Фото",ef:"Постов нет. Будьте первым!",av:"Аватар",rl:"СТАТУС",st:"Ученик",tc:"Учитель",geo:"Регион и школа",ct:"СТРАНА",rgn:"ОБЛАСТЬ",sc:"ШКОЛА",kl:"КЛАСС",c1:"Выберите страну",c2:"Выберите область",c4:"Выберите школу",c5:"Выберите класс",bd:"ДЕНЬ РОЖДЕНИЯ",hd:"Скрыть",ht:"СЕРДЦЕ",hA:"Свободен(а)",hC:"Всё сложно",hL:"Занят(а)",hP:"Секрет",sv:"Сохранить",svd:"Сохранено!",ac:"Безопасность",aU:"Новый username",aC:"Текущий пароль",aN:"Новый пароль",up:"Обновить",chs:"Чаты",nc:"+ Новый",slc:"Выберите чат",mp:"Сообщение...",nch:"Чатов нет",pu:"Введите username:",np:"Новое объявление...",pb:"Опубликовать",nn:"Новостей нет",bd2:"Право на новости",gr:"Переключить право",ed:"Изменить",dl:"Удалить",fl:"Подписаться",uf:"Отписаться",sm:"Написать",hdn:"Скрыто",rp:"Ответ...",snd:"Отправить",cn:"отмена",fc:"Будьте первым",cd:"Точно удалить?",ep:"Новый текст:",rpl:"Ответить",nnt:"Уведомлений нет",l1:"понравился ваш пост",l2:"комментировал",l3:"отправил сообщение",l4:"новое объявление",cN:"Имя",cT:"Должность",cB:"Био",addCeo:"Добавить нового CEO",today:"Сегодня",yesterday:"Вчера",editedTag:"(изменено)",editingMsg:"Редактирование сообщения...",vS:"Поиск",srchPh:"Поиск пользователей...",nosr:"Никто не найден",noCard:"Карта ещё не указана",supTitle:"Поддержка",supEdit:"Изменить",ul:"Поделиться",shCopied:"Ссылка скопирована!",loading:"Загрузка",settings:"Настройки",trophy:"Трофеи",noTr:"Сертификатов пока нет",univ:"В какой университет вы поступаете?",univPh:"напр. TATU, INHA, Национальный университет...",lang:"ЯЗЫК",followers:"Подписчики",following:"Подписки",noFol:"Пока никого нет",myPosts:"Посты",noMyPosts:"Постов нет",verified:"Подтверждено",addCert:"Выдать сертификат",certTitle:"Название сертификата",certUser:"@username",certImg:"Прикрепить фото",certAdd:"Выдать",closeX:"Закрыть",support:"Поддержка",bossCab:"Boss Cabinet"}};
 function t(k){return (TR[LANG]&&TR[LANG][k])||TR.uz[k]||k}
 
 var HO='<svg class="w-5 h-5 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
@@ -561,24 +534,23 @@ function setU(u){me=u;localStorage.setItem("chalker_user",JSON.stringify(u))}
 function logout(){localStorage.removeItem("chalker_user");me=null;curView=null;clearInterval(ntT);hd("appView");sh("authView")}
 
 var NI={
-feed:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>',
-news:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8"><rect x="3" y="4" width="15" height="16" rx="2"/><path d="M18 8h3v10a2 2 0 0 1-2 2H5"/><path d="M7 8h7M7 12h7M7 16h4"/></svg>',
-profile:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-6 8-6s6.5 2 8 6"/></svg>',
-search:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>',
-notif:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>',
-support:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>'};
+feed:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.3"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>',
+news:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.3"><rect x="3" y="4" width="15" height="16" rx="2"/><path d="M18 8h3v10a2 2 0 0 1-2 2H5"/><path d="M7 8h7M7 12h7M7 16h4"/></svg>',
+profile:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.3"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-6 8-6s6.5 2 8 6"/></svg>',
+search:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.3"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>',
+notif:'<svg class="nvic" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.3"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>'};
 function buildNav(){
  var it=[["feed",t("v1")],["news",t("v2")],["search",t("vS")],["notif",t("v5")],["profile",t("v3")]];
  var h="";
  for(var i=0;i<it.length;i++){
   var key=it[i][0],label=it[i][1];
   var dot=key==="notif"?'<span id="nDot" class="dot hide absolute top-0.5 right-2 md:static md:ml-1.5"></span>':"";
-  h+='<div id="navitem-'+key+'" onclick="showView(\''+key+'\')" class="nv relative flex items-center justify-center md:justify-start gap-0 md:gap-4 px-0 md:px-4 py-3.5 rounded-full cursor-pointer font-extrabold text-xl tracking-tight" title="'+label+'">'+NI[key]+'<span class="hidden md:inline">'+label+'</span>'+dot+'</div>';
+  h+='<div id="navitem-'+key+'" onclick="showView(\''+key+'\')" class="nv relative flex items-center justify-center md:justify-start gap-0 md:gap-5 px-0 md:px-5 py-4 rounded-full cursor-pointer font-extrabold text-2xl tracking-tight" title="'+label+'">'+NI[key]+'<span class="hidden md:inline">'+label+'</span>'+dot+'</div>';
  }
  $("navBox").innerHTML=h;
  buildBottomNav()}
 function buildBottomNav(){
- var it=[["feed",t("v1")],["news",t("v2")],["search",t("vS")],["notif",t("v5")],["profile",t("v3")],["support",t("support")]];
+ var it=[["feed",t("v1")],["news",t("v2")],["search",t("vS")],["notif",t("v5")],["profile",t("v3")]];
  var h="";
  for(var i=0;i<it.length;i++){
   var key=it[i][0],label=it[i][1];
@@ -587,12 +559,12 @@ function buildBottomNav(){
  }
  $("bottomNavBox").innerHTML=h}
 function setActiveNav(n){
- ["feed","news","search","notif","profile","support"].forEach(function(v){
+ ["feed","news","search","notif","profile"].forEach(function(v){
   var el=$("navitem-"+v);if(el){if(v===n)el.classList.add("nvactive");else el.classList.remove("nvactive")}
   var bel=$("bnavitem-"+v);if(bel){if(v===n)bel.classList.add("nvactive");else bel.classList.remove("nvactive")}});
 }
 function toggleViews(n){
- ["feed","news","profile","notif","search","support"].forEach(function(v){if(v===n)sh("view-"+v);else hd("view-"+v)});
+ ["feed","news","profile","notif","search"].forEach(function(v){if(v===n)sh("view-"+v);else hd("view-"+v)});
  if(n!=="feed"&&$("feedList"))$("feedList").innerHTML="";
  if(n!=="profile"&&$("vpPosts"))$("vpPosts").innerHTML="";
  setActiveNav(n)}
@@ -601,8 +573,7 @@ function showView(n){
  if(n===curView){toggleViews(n);return}
  curView=n;toggleViews(n);
  if(n==="feed")loadFeed();if(n==="news")loadNews();if(n==="profile"&&me)loadProfilePage(me.username,true);
- if(n==="notif")loadNotifs(true);if(n==="search"){$("srchList").innerHTML="";$("srchInp").value="";$("srchInp").focus()}
- if(n==="support")loadSupport()}
+ if(n==="notif")loadNotifs(true);if(n==="search"){$("srchList").innerHTML="";$("srchInp").value="";$("srchInp").focus()}}
 /* FEED */
 async function loadFeed(){try{
  $("feedList").innerHTML=loaderHTML();
@@ -822,33 +793,6 @@ async function srchFollow(u,btn){
   else{btn.textContent=t("fl");btn.className="shrink-0 bb text-white font-bold rounded-full px-4 py-1.5 text-xs"}
  }catch(e){alert(e.message)}}
 
-/* SUPPORT (synced between desktop aside and mobile support view) */
-async function loadSupport(){try{
- $("supportShow").innerHTML=loaderHTML(true);if($("supportShowM"))$("supportShowM").innerHTML=loaderHTML(true);
- var d=await api("/support");
- var masked=d.card_number?d.card_number:t("noCard");
- var html='<p class="text-[11px] text-gray-500 font-extrabold tracking-widest uppercase">'+esc(d.card_type||"Humo")+'</p>'+
-  '<p class="text-xl font-mono font-extrabold tracking-wider mt-0.5">'+esc(masked)+'</p>'+
-  (d.card_holder?'<p class="text-xs text-gray-400 font-bold mt-1">'+esc(d.card_holder)+'</p>':'');
- $("supportShow").innerHTML=html;if($("supportShowM"))$("supportShowM").innerHTML=html;
- if($("tSupportM"))$("tSupportM").textContent=t("supTitle");
- if($("tSupSaveM"))$("tSupSaveM").textContent=t("sv");
- if(me.username==="boss"){
-  sh("supEditBtn");$("supEditBtn").textContent=t("supEdit");
-  $("scType").value=d.card_type||"Humo";$("scNumber").value=d.card_number||"";$("scHolder").value=d.card_holder||"";
-  if($("supEditBtnM")){sh("supEditBtnM");$("supEditBtnM").textContent=t("supEdit");$("scTypeM").value=d.card_type||"Humo";$("scNumberM").value=d.card_number||"";$("scHolderM").value=d.card_holder||""}
- }else{hd("supEditBtn");hd("supportEditWrap");if($("supEditBtnM")){hd("supEditBtnM");hd("supportEditWrapM")}}
-}catch(e){}}
-function toggleSupportEdit(){$("supportEditWrap").classList.toggle("hide");if($("supportEditWrapM"))$("supportEditWrapM").classList.toggle("hide")}
-async function saveSupport(){
- try{
-  var ty=($("scTypeM")&&!$("supportEditWrapM").classList.contains("hide"))?$("scTypeM").value:$("scType").value;
-  var nu=($("scNumberM")&&!$("supportEditWrapM").classList.contains("hide"))?$("scNumberM").value.trim():$("scNumber").value.trim();
-  var ho=($("scHolderM")&&!$("supportEditWrapM").classList.contains("hide"))?$("scHolderM").value.trim():$("scHolder").value.trim();
-  await api("/support/update",pj({user_id:me.id,card_type:ty,card_number:nu,card_holder:ho}));
-  hd("supportEditWrap");if($("supportEditWrapM"))hd("supportEditWrapM");loadSupport();alert(t("svd"))
- }catch(e){alert(e.message)}}
-
 /* NOTIFICATIONS */
 async function loadNotifs(mark){try{
  if(mark)$("ntList").innerHTML=loaderHTML();
@@ -892,7 +836,17 @@ async function loadProfilePage(u,isSelf){try{
  if(isSelf){sh("vpGear");hd("vpFollowBtn");sh("addCertBtn")}
  else{hd("vpGear");sh("vpFollowBtn");hd("addCertBtn");hd("certFormBox");$("vpFollowBtn").textContent=d.is_following?t("uf"):t("fl");
   $("vpFollowBtn").className="bb text-white font-bold rounded-full px-5 py-2 text-sm"+(d.is_following?" border brd":"")}
- loadTrophy(d.username,isSelf);loadUserPosts(d.username)
+ if(d.username==="boss"){
+  hd("trophyBox");
+  if($("tBossCab"))$("tBossCab").textContent=t("bossCab");
+  if($("tBD"))$("tBD").textContent=t("bd2");
+  if($("tGr"))$("tGr").textContent=t("gr");
+  if(isSelf)sh("bossCabinetBox");else hd("bossCabinetBox");
+  loadUserPosts(d.username)
+ }else{
+  sh("trophyBox");hd("bossCabinetBox");
+  loadTrophy(d.username,isSelf);loadUserPosts(d.username)
+ }
 }catch(e){alert(e.message)}}
 async function tglFollowVP(){try{await api("/users/follow",pj({follower_id:me.id,following_username:mUser.username}));loadProfilePage(mUser.username,false)}catch(e){alert(e.message)}}
 function toggleCertForm(){$("certFormBox").classList.toggle("hide")}
@@ -962,16 +916,15 @@ function applyLang(){
  $("nInp").placeholder=t("np");$("tPub").textContent=t("pb");$("tBD").textContent=t("bd2");$("tGr").textContent=t("gr");
  $("tAddCert").textContent=t("addCert");$("ctTitle").placeholder=t("certTitle");
  $("tCtImg").textContent="\u{1F4CE} "+t("certImg");$("tCtAdd").textContent=t("certAdd");$("tDelCert").textContent=t("dl");
- $("srchInp").placeholder=t("srchPh");$("tSupport").textContent=t("supTitle");$("tSupSave").textContent=t("sv");
+ $("srchInp").placeholder=t("srchPh");
  $("eL").innerHTML=EY;$("eR").innerHTML=EY;$("e1").innerHTML=EY;$("e2").innerHTML=EY}
 function renderSide(){
  $("sAv").src=ava(me.avatar_base64);$("cAv").src=ava(me.avatar_base64);$("mobAv").src=ava(me.avatar_base64);
  $("sNm").innerHTML=esc(me.fullname||me.username)+bdg(me.username,me.can_post_news);
  $("sUn").textContent="@"+me.username;
- if(me.username==="boss"||me.can_post_news===1)sh("newsComposer");else hd("newsComposer");
- if(me.username==="boss")sh("bossPanel");else hd("bossPanel")}
+ if(me.username==="boss"||me.can_post_news===1)sh("newsComposer");else hd("newsComposer")}
 function boot(){
- curView=null;hd("authView");sh("appView");buildNav();renderSide();showView("feed");loadSupport();
+ curView=null;hd("authView");sh("appView");buildNav();renderSide();showView("feed");
  clearInterval(ntT);ntT=setInterval(function(){loadNotifs(false)},20000);loadNotifs(false)}
 function initTelegram(){
  try{
