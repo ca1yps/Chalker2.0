@@ -819,7 +819,7 @@ async function delNCmt(newsId, commentId) {
 
 async function sendNCmt(id) {
   if (!me || !me.id) return alert("Avval tizimga kiring!");
-  var i = $("#nci-" + id), c = i.value.trim();
+  var i = $("nci-" + id), c = i.value.trim();
   if (!c) return;
   try {
     await api("/news/comments/create", pj({ user_id: me.id, news_id: id, content: c }));
@@ -833,11 +833,11 @@ async function sendNCmt(id) {
 
 async function pubNews() {
   if (!me || !me.id) return alert("Avval tizimga kiring!");
-  var v = $("#nInp").value.trim();
+  var v = $("nInp").value.trim();
   if (!v) return;
   try {
     await api("/news/create", pj({ user_id: me.id, title: v }));
-    $("#nInp").value = "";
+    $("nInp").value = "";
     loadNews();
   } catch (e) {
     alert(e.message);
@@ -869,12 +869,12 @@ async function dlNews(id) {
 
 async function grantNews() {
   if (!me || !me.id) return alert("Avval tizimga kiring!");
-  var u = $("#gU").value.trim();
+  var u = $("gU").value.trim();
   if (!u) return;
   try {
     var d = await api("/admin/news_rights", pj({ boss_id: me.id, target_username: u }));
     alert("@" + u.replace(/^@/, "") + (d.granted ? " \u2713" : " \u2717"));
-    $("#gU").value = "";
+    $("gU").value = "";
   } catch (e) {
     alert(e.message);
   }
