@@ -20,7 +20,8 @@
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth;height:100%}
-.min-h-screen{min-height:100vh;min-height:100dvh}
+body{min-height:100vh;min-height:100dvh;min-height:calc(var(--vh,1vh)*100)}
+.min-h-screen{min-height:100vh;min-height:100dvh;min-height:calc(var(--vh,1vh)*100)}
 .h-screen{height:100vh;height:100dvh}
 body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;letter-spacing:.1px;-webkit-font-smoothing:antialiased}
 body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background:
@@ -610,11 +611,20 @@ function sharePost(id){var url=window.location.origin+"/?post="+id;
  else alert(url)}
 function openLightbox(src){var lb=$("lightbox");$("lbImg").src=src;lb.classList.remove("hide")}
 function closeLightbox(){$("lightbox").classList.add("hide");$("lbImg").src=""}
-async function react(id){try{
- var d=await api("/posts/like",pj({user_id:me.id,post_id:id,is_like:1}));var p=pCache[id];
- if(d.liked){p.my_status=1;p.likes_count++}else{p.my_status=null;p.likes_count--}
- var b=$("lk-"+id);b.innerHTML=lkH(p);b.className="pAct"+(p.my_status===1?' on':'')
-}catch(e){alert(e.message)}}
+function react(id){
+ var p=pCache[id];if(!p||p._lkBusy)return;p._lkBusy=true;
+ var wasLiked=p.my_status===1,prevCount=p.likes_count;
+ p.my_status=wasLiked?null:1;p.likes_count=wasLiked?prevCount-1:prevCount+1;
+ var b=$("lk-"+id);b.innerHTML=lkH(p);b.className="pAct"+(p.my_status===1?' on':'');
+ api("/posts/like",pj({user_id:me.id,post_id:id,is_like:1})).then(function(d){
+  p.my_status=d.liked?1:null;p.likes_count=prevCount+(d.liked?1:0)-(wasLiked?1:0);
+  var b2=$("lk-"+id);if(b2){b2.innerHTML=lkH(p);b2.className="pAct"+(p.my_status===1?' on':'')}
+  p._lkBusy=false
+ }).catch(function(e){
+  p.my_status=wasLiked?1:null;p.likes_count=prevCount;
+  var b2=$("lk-"+id);if(b2){b2.innerHTML=lkH(p);b2.className="pAct"+(p.my_status===1?' on':'')}
+  p._lkBusy=false;alert(e.message)
+ })}
 async function edPost(id){var n=prompt(t("ep"),pCache[id].content);if(n===null)return;
  try{await api("/posts/update",pj({user_id:me.id,post_id:id,content:n}));pCache[id].content=n;$("pt-"+id).innerHTML=lm(esc(n))}catch(e){alert(e.message)}}
 async function dlPost(id){if(!confirm(t("cd")))return;
@@ -657,18 +667,49 @@ async function loadCmts(id){try{$("cl-"+id).innerHTML=loaderHTML(true);var l=awa
   '<button onclick="setRep('+id+','+c.id+',\''+c.username+'\')" class="text-xs text-gray-500 hover:text-white font-semibold">'+t("rpl")+'</button>'+delBtn+'</div></div></div></div>'}
  var h="";l.forEach(function(c){if(!c.parent_id){h+=one(c,false);l.forEach(function(r){if(r.parent_id===c.id)h+=one(r,true)})}});
  $("cl-"+id).innerHTML=h||'<p class="text-gray-600 text-xs">'+t("fc")+'</p>'}catch(e){alert(e.message)}}
-async function delCmt(postId,commentId){if(!confirm(t("cd")))return;
- try{await api("/comments/delete",pj({user_id:me.id,comment_id:commentId}));
-  if(pCache[postId]&&pCache[postId].comments_count>0){pCache[postId].comments_count--;
-   var countBtn=document.querySelector('[onclick="tglC('+postId+')"]');
-   if(countBtn)countBtn.innerHTML="\u{1F4AC} "+pCache[postId].comments_count}
-  loadCmts(postId)}catch(e){alert(e.message)}}
-function setRep(p,c,u){rT[p]={id:c};var h=$("rh-"+p);h.innerHTML="@"+u+" <span class='cursor-pointer text-red-400' onclick='cnlRep("+p+")'>"+t("cn")+"</span>";h.classList.remove("hide");$("ci-"+p).focus()}
-function cnlRep(p){delete rT[p];$("rh-"+p).classList.add("hide")}
-async function sendCmt(p){var i=$("ci-"+p),c=i.value.trim();if(!c)return;
- try{await api("/comments/create",pj({user_id:me.id,post_id:p,content:c,parent_id:rT[p]?rT[p].id:null}));
-  i.value="";cnlRep(p);oC[p]=true;loadCmts(p)}catch(e){alert(e.message)}}
+async function delCmt(postId, commentId) {
+  if (!confirm(t("cd"))) return;
+  try {
+    await api("/comments/delete", pj({ user_id: me?.id, comment_id: commentId }));
+    var countBtn = document.querySelector('[onclick="tglC(\'' + postId + '\')"]');
+    if (countBtn && pCache[postId]) {
+      countBtn.innerHTML = "\u{1F4AC} " + pCache[postId].comments_count;
+    }
+    loadCmts(postId);
+  } catch (e) {
+    alert(e.message);
+  }
+}
 
+function setRep(p, c, u) {
+  rT[p] = { id: c };
+  var h = $("rh-" + p);
+  if (h) {
+    h.innerHTML = "@" + u + " <span class='cursor-pointer text-red-400' onclick='cnlRep(" + p + ")'>x</span>";
+  }
+}
+
+function cnlRep(p) {
+  delete rT[p];
+  var h = $("rh-" + p);
+  if (h) h.classList.add("hide");
+}
+
+async function sendCmt(p) {
+  var i = $("ci-" + p);
+  if (!i) return;
+  var c = i.value.trim();
+  if (!c) return;
+  try {
+    await api("/comments/create", pj({ user_id: me?.id, post_id: p, content: c, parent_id: rT[p] ? rT[p].id : null }));
+    i.value = "";
+    cnlRep(p);
+    oC[p] = true;
+    loadCmts(p);
+  } catch (e) {
+    alert(e.message);
+  }
+}
 /* PROFILE SETTINGS (own account only, opened via gear icon) */
 var UZ_REGIONS=GEO["O'zbekiston"];
 function fillSel(s,items,cur,ph){var h='<option value="">'+ph+'</option>';items.forEach(function(i){h+='<option value="'+i+'"'+(i===cur?' selected':'')+'>'+i+'</option>'});s.innerHTML=h}
@@ -725,10 +766,20 @@ async function loadNews(){try{
  $("newsList").innerHTML=h;
  ns.forEach(function(n){if(oNC[n.id]){sh("ncm-"+n.id);loadNCmts(n.id)}})
 }catch(e){alert(e.message)}}
-async function nReact(id){try{
- var d=await api("/news/like",pj({user_id:me.id,news_id:id}));var n=nCache[id];
- if(d.liked){n.my_like=1;n.likes_count++}else{n.my_like=null;n.likes_count--}
- var b=$("nlk-"+id);b.innerHTML=nlkH(n);b.className="pAct"+(n.my_like?' on':'')}catch(e){alert(e.message)}}
+function nReact(id){
+ var n=nCache[id];if(!n||n._lkBusy)return;n._lkBusy=true;
+ var wasLiked=!!n.my_like,prevCount=n.likes_count;
+ n.my_like=wasLiked?null:1;n.likes_count=wasLiked?prevCount-1:prevCount+1;
+ var b=$("nlk-"+id);b.innerHTML=nlkH(n);b.className="pAct"+(n.my_like?' on':'');
+ api("/news/like",pj({user_id:me.id,news_id:id})).then(function(d){
+  n.my_like=d.liked?1:null;n.likes_count=prevCount+(d.liked?1:0)-(wasLiked?1:0);
+  var b2=$("nlk-"+id);if(b2){b2.innerHTML=nlkH(n);b2.className="pAct"+(n.my_like?' on':'')}
+  n._lkBusy=false
+ }).catch(function(e){
+  n.my_like=wasLiked?1:null;n.likes_count=prevCount;
+  var b2=$("nlk-"+id);if(b2){b2.innerHTML=nlkH(n);b2.className="pAct"+(n.my_like?' on':'')}
+  n._lkBusy=false;alert(e.message)
+ })}
 function tglNC(id){var b=$("ncm-"+id);if(b.classList.contains("hide")){b.classList.remove("hide");oNC[id]=true;loadNCmts(id)}else{b.classList.add("hide");oNC[id]=false}}
 async function loadNCmts(id){try{var l=await api("/news/comments?news_id="+id+"&viewer_id="+me.id);var h="";
  l.forEach(function(c){var canDel=(c.username===me.username||me.username==="boss");
@@ -738,30 +789,96 @@ async function loadNCmts(id){try{var l=await api("/news/comments?news_id="+id+"&
   ' <span class="text-gray-500 text-xs">@'+c.username+'</span><p class="text-sm break-words">'+lm(esc(c.content))+'</p>'+
   '<div class="flex items-center gap-2 mt-1"><button id="nclk-'+c.id+'" onclick="cmtReact('+c.id+',true)" class="stk cstk stk-like'+(c.my_like?' on':'')+'">'+(c.my_like?HF:HO)+' '+(c.likes_count||0)+'</button>'+delBtn+'</div></div></div>'});
  $("ncl-"+id).innerHTML=h||'<p class="text-gray-600 text-xs">'+t("fc")+'</p>'}catch(e){alert(e.message)}}
-async function cmtReact(id,isNews){try{
+function cmtReact(id,isNews){
+ var b=$((isNews?"nclk-":"clk-")+id);if(!b||b.dataset.busy==="1")return;b.dataset.busy="1";
+ var wasLiked=b.classList.contains("on"),prevCount=parseInt(b.textContent.trim().split(/\s+/).pop(),10)||0;
+ var newCount=wasLiked?prevCount-1:prevCount+1;
+ b.innerHTML=(wasLiked?HO:HF)+' '+newCount;b.className="stk cstk stk-like"+(wasLiked?'':' on');
  var ep=isNews?"/news/comments/like":"/comments/like";
- var d=await api(ep,pj({user_id:me.id,comment_id:id}));
- var b=$((isNews?"nclk-":"clk-")+id);
- b.innerHTML=(d.liked?HF:HO)+' '+d.count;
- b.className="stk cstk stk-like"+(d.liked?' on':'')
-}catch(e){alert(e.message)}}
-async function delNCmt(newsId,commentId){if(!confirm(t("cd")))return;
- try{await api("/news/comments/delete",pj({user_id:me.id,comment_id:commentId}));
-  if(nCache[newsId]&&nCache[newsId].comments_count>0){nCache[newsId].comments_count--;
-   var countBtn=document.querySelector('[onclick="tglNC('+newsId+')"]');
-   if(countBtn)countBtn.innerHTML="\u{1F4AC} "+nCache[newsId].comments_count}
-  loadNCmts(newsId)}catch(e){alert(e.message)}}
-async function sendNCmt(id){var i=$("nci-"+id),c=i.value.trim();if(!c)return;
- try{await api("/news/comments/create",pj({user_id:me.id,news_id:id,content:c}));i.value="";oNC[id]=true;loadNCmts(id)}catch(e){alert(e.message)}}
-async function pubNews(){var v=$("nInp").value.trim();if(!v)return;
- try{await api("/news/create",pj({user_id:me.id,title:v}));$("nInp").value="";loadNews()}catch(e){alert(e.message)}}
-async function edNews(id){var n=prompt(t("ep"),nCache[id].title);if(n===null)return;
- try{await api("/news/update",pj({user_id:me.id,news_id:id,title:n}));loadNews()}catch(e){alert(e.message)}}
-async function dlNews(id){if(!confirm(t("cd")))return;
- try{await api("/news/delete",pj({user_id:me.id,news_id:id}));loadNews()}catch(e){alert(e.message)}}
-async function grantNews(){var u=$("gU").value.trim();if(!u)return;
- try{var d=await api("/admin/news_rights",pj({boss_id:me.id,target_username:u}));
-  alert("@"+u.replace(/^@/,"")+(d.granted?" \u2713":" \u2717"));$("gU").value=""}catch(e){alert(e.message)}}
+ api(ep,pj({user_id:me.id,comment_id:id})).then(function(d){
+  var b2=$((isNews?"nclk-":"clk-")+id);if(b2){b2.innerHTML=(d.liked?HF:HO)+' '+d.count;b2.className="stk cstk stk-like"+(d.liked?' on':'');b2.dataset.busy="0"}
+ }).catch(function(e){
+  var b2=$((isNews?"nclk-":"clk-")+id);if(b2){b2.innerHTML=(wasLiked?HF:HO)+' '+prevCount;b2.className="stk cstk stk-like"+(wasLiked?' on':'');b2.dataset.busy="0"}
+  alert(e.message)
+ })}
+async function delNCmt(newsId, commentId) {
+  if (!me || !me.id) return alert("Avval tizimga kiring!");
+  if (!confirm(t("cd"))) return;
+  try {
+    await api("news/comments/delete", pj({ user_id: me.id, comment_id: commentId }));
+    if (nCache[newsId] && nCache[newsId].comments_count > 0) {
+      nCache[newsId].comments_count--;
+      var countBtn = document.querySelector('[onclick="tglNC(' + newsId + ')"]');
+      if (countBtn) countBtn.innerHTML = "\u1F4AC " + nCache[newsId].comments_count;
+    }
+    loadNCmts(newsId);
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function sendNCmt(id) {
+  if (!me || !me.id) return alert("Avval tizimga kiring!");
+  var i = $("#nci-" + id), c = i.value.trim();
+  if (!c) return;
+  try {
+    await api("/news/comments/create", pj({ user_id: me.id, news_id: id, content: c }));
+    i.value = "";
+    oNC[id] = true;
+    loadNCmts(id);
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function pubNews() {
+  if (!me || !me.id) return alert("Avval tizimga kiring!");
+  var v = $("#nInp").value.trim();
+  if (!v) return;
+  try {
+    await api("/news/create", pj({ user_id: me.id, title: v }));
+    $("#nInp").value = "";
+    loadNews();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function edNews(id) {
+  if (!me || !me.id) return alert("Avval tizimga kiring!");
+  var n = prompt(t("ep"), nCache[id].title);
+  if (n === null) return;
+  try {
+    await api("/news/update", pj({ user_id: me.id, news_id: id, title: n }));
+    loadNews();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function dlNews(id) {
+  if (!me || !me.id) return alert("Avval tizimga kiring!");
+  if (!confirm(t("cd"))) return;
+  try {
+    await api("/news/delete", pj({ user_id: me.id, news_id: id }));
+    loadNews();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function grantNews() {
+  if (!me || !me.id) return alert("Avval tizimga kiring!");
+  var u = $("#gU").value.trim();
+  if (!u) return;
+  try {
+    var d = await api("/admin/news_rights", pj({ boss_id: me.id, target_username: u }));
+    alert("@" + u.replace(/^@/, "") + (d.granted ? " \u2713" : " \u2717"));
+    $("#gU").value = "";
+  } catch (e) {
+    alert(e.message);
+  }
+}
 
 /* SEARCH */
 var srchT=null;
@@ -938,6 +1055,12 @@ function initTelegram(){
   }
  }catch(e){/* not running inside Telegram, or SDK unavailable — ignore safely */}
 }
+function setRealVH(){var h=(window.visualViewport&&window.visualViewport.height)||window.innerHeight;
+ document.documentElement.style.setProperty("--vh",(h*0.01)+"px")}
+setRealVH();
+window.addEventListener("resize",setRealVH);
+window.addEventListener("orientationchange",function(){setTimeout(setRealVH,150)});
+if(window.visualViewport)window.visualViewport.addEventListener("resize",setRealVH);
 document.addEventListener("DOMContentLoaded",function(){
  initTelegram();
  applyLang();
