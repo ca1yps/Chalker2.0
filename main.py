@@ -31,15 +31,34 @@ app = FastAPI(title="Chalker")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 
+import psycopg2.pool
+
+# ---------------------------------------------------------------------------
+# Connection pool
+# ---------------------------------------------------------------------------
+# The old code called psycopg2.connect(...) on EVERY single API request and
+# never guaranteed it would be closed if a request errored out early. Under
+# real traffic that opens a fresh physical connection to Supabase for each
+# click in the app and leaks any that hit an exception -- which is exactly
+# what fills up Supabase's connection/RAM quota over time ("too many
+# connections" / memory bloat). A small pool of reused connections fixes
+# this without changing any request/response behavior.
+_POOL = psycopg2.pool.ThreadedConnectionPool(
+    1, 10, DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor
+)
+
+
 class Conn:
     """Thin wrapper so the rest of the file can keep using the same
     sqlite3-style pattern: c.execute(sql, params).fetchone()/.fetchall(),
-    c.commit(), c.close() -- but talking to Postgres underneath.
+    c.commit(), c.close() -- but talking to Postgres underneath, via a
+    pooled connection instead of opening a brand new one every time.
     '?' placeholders are auto-converted to psycopg2's '%s' style so none
     of the query strings below needed to be rewritten by hand."""
 
     def __init__(self):
-        self._conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+        self._conn = _POOL.getconn()
+        self._returned = False
 
     def execute(self, sql, params=()):
         cur = self._conn.cursor()
@@ -55,7 +74,26 @@ class Conn:
         self._conn.commit()
 
     def close(self):
-        self._conn.close()
+        # Return the connection to the pool instead of physically closing
+        # it, so it can be reused by the next request.
+        if self._returned:
+            return
+        self._returned = True
+        try:
+            self._conn.rollback()
+        except Exception:
+            pass
+        _POOL.putconn(self._conn)
+
+    def __del__(self):
+        # Safety net: if an endpoint throws before calling c.close() (a bug,
+        # an unexpected error, etc.) the connection still gets returned to
+        # the pool here once the Conn object is garbage-collected, instead
+        # of being leaked forever and slowly exhausting Supabase.
+        try:
+            self.close()
+        except Exception:
+            pass
 
 
 def db():
