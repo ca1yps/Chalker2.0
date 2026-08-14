@@ -206,6 +206,10 @@ class CertSelfCreate(BaseModel):
 class CertSelfDel(BaseModel):
     user_id: int; cert_id: int
 
+@app.get("/ping")
+def ping():
+    return "OK"
+
 @app.get("/", response_class=HTMLResponse)
 def index():
     with open(INDEX, "r", encoding="utf-8") as f:
