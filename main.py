@@ -1,24 +1,37 @@
 import os
+import queue
+import threading
+import uuid
 from typing import Optional
-import psycopg2
-import psycopg2.extras
-from fastapi import FastAPI, Form
+
+import boto3
+from botocore.client import Config as _BotoConfig
+import pyodbc
+
+from fastapi import FastAPI, Form, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 # ---------------------------------------------------------------------------
-# Database connection (PostgreSQL / Supabase)
+# Database connection (Azure SQL Database, via pyodbc)
 # ---------------------------------------------------------------------------
-# Prefer an environment variable (set this in Render's dashboard -> Environment)
-# so the real password never has to live inside the source code / git repo.
-# A fallback to the URL you gave me is kept here so the app still works even
-# if you forget to set the env var, but for production please set DATABASE_URL
-# in Render instead of relying on the fallback below.
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://postgres.lbypohelsiicjjfucppa:Ilyo%246eey06072009@"
-    "aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres?",
+# Set AZURE_SQL_CONNECTIONSTRING in your host's Environment settings (Render
+# -> Environment) -- never commit the real password into the repo / git
+# history. Example value:
+#   DRIVER={ODBC Driver 18 for SQL Server};SERVER=tcp:chalker-server.database.windows.net,1433;
+#   DATABASE=free-sql-db-5447952;UID=chalkeradmin;PWD=<parolingiz>;
+#   Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;
+AZURE_CONN_STR = os.getenv(
+    "AZURE_SQL_CONNECTIONSTRING",
+    "DRIVER={ODBC Driver 18 for SQL Server};"
+    "SERVER=tcp:chalker-server.database.windows.net,1433;"
+    "DATABASE=free-sql-db-5447952;"
+    "Uid=chalkeradmin;"
+    "Pwd=ilyo$6eey06072009;"  # <-- Shu yerga Azure SQL parolingizni yozing!
+    "Encrypt=yes;"
+    "TrustServerCertificate=no;"
+    "Connection Timeout=30;"
 )
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -31,44 +44,90 @@ app = FastAPI(title="Chalker")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 
-import psycopg2.pool
-
 # ---------------------------------------------------------------------------
 # Connection pool
 # ---------------------------------------------------------------------------
-# The old code called psycopg2.connect(...) on EVERY single API request and
-# never guaranteed it would be closed if a request errored out early. Under
-# real traffic that opens a fresh physical connection to Supabase for each
-# click in the app and leaks any that hit an exception -- which is exactly
-# what fills up Supabase's connection/RAM quota over time ("too many
-# connections" / memory bloat). A small pool of reused connections fixes
-# this without changing any request/response behavior.
-_POOL = psycopg2.pool.ThreadedConnectionPool(
-    1, 10, DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor
-)
+# pyodbc has no built-in pool like psycopg2.pool.ThreadedConnectionPool, so
+# this is a small hand-rolled one: up to POOL_SIZE live connections are kept
+# around and reused across requests instead of opening (and leaking, if an
+# endpoint errors before closing it) a brand new physical connection to
+# Azure SQL on every single API call.
+# ---------------------------------------------------------------------------
+_POOL_SIZE = 5
+_pool = queue.Queue(maxsize=_POOL_SIZE)
+_pool_lock = threading.Lock()
+_pool_created = 0
+
+
+def _new_conn():
+    return pyodbc.connect(AZURE_CONN_STR, autocommit=False)
+
+
+def _get_conn():
+    global _pool_created
+    try:
+        return _pool.get_nowait()
+    except queue.Empty:
+        pass
+    with _pool_lock:
+        if _pool_created < _POOL_SIZE:
+            _pool_created += 1
+            return _new_conn()
+    # Pool is fully allocated and every connection is currently in use --
+    # wait for one to be returned rather than opening an unbounded number
+    # of physical connections to Azure SQL.
+    return _pool.get()
+
+
+def _put_conn(conn):
+    try:
+        _pool.put_nowait(conn)
+    except queue.Full:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+class _CursorWrap:
+    """Wraps a pyodbc cursor so fetchone()/fetchall() return plain dicts
+    keyed by column name -- pyodbc.Row objects only support index/attribute
+    access, but the rest of this file was written expecting RealDictCursor
+    -style dict rows (r["colname"], dict(r), etc)."""
+
+    def __init__(self, cur):
+        self._cur = cur
+
+    def _cols(self):
+        return [d[0] for d in self._cur.description] if self._cur.description else []
+
+    def fetchone(self):
+        row = self._cur.fetchone()
+        if row is None:
+            return None
+        return dict(zip(self._cols(), row))
+
+    def fetchall(self):
+        cols = self._cols()
+        return [dict(zip(cols, row)) for row in self._cur.fetchall()]
 
 
 class Conn:
     """Thin wrapper so the rest of the file can keep using the same
     sqlite3-style pattern: c.execute(sql, params).fetchone()/.fetchall(),
-    c.commit(), c.close() -- but talking to Postgres underneath, via a
-    pooled connection instead of opening a brand new one every time.
-    '?' placeholders are auto-converted to psycopg2's '%s' style so none
-    of the query strings below needed to be rewritten by hand."""
+    c.commit(), c.close() -- but talking to Azure SQL underneath via
+    pyodbc, using a small pool of reused connections. pyodbc natively
+    accepts '?' placeholders, so none of the query strings below needed
+    to be rewritten for that."""
 
     def __init__(self):
-        self._conn = _POOL.getconn()
+        self._conn = _get_conn()
         self._returned = False
 
     def execute(self, sql, params=()):
         cur = self._conn.cursor()
-        cur.execute(sql.replace("?", "%s"), params)
-        return cur
-
-    def executescript(self, sql):
-        cur = self._conn.cursor()
-        cur.execute(sql)
-        return cur
+        cur.execute(sql, tuple(params))
+        return _CursorWrap(cur)
 
     def commit(self):
         self._conn.commit()
@@ -83,13 +142,14 @@ class Conn:
             self._conn.rollback()
         except Exception:
             pass
-        _POOL.putconn(self._conn)
+        _put_conn(self._conn)
 
     def __del__(self):
         # Safety net: if an endpoint throws before calling c.close() (a bug,
         # an unexpected error, etc.) the connection still gets returned to
         # the pool here once the Conn object is garbage-collected, instead
-        # of being leaked forever and slowly exhausting Supabase.
+        # of being leaked forever and slowly exhausting Azure SQL's
+        # connection quota.
         try:
             self.close()
         except Exception:
@@ -103,39 +163,143 @@ def db():
 def init():
     c = db()
     statements = [
-        """CREATE TABLE IF NOT EXISTS users(id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL,
-          fullname TEXT, school_class TEXT, school_name TEXT, country TEXT, region TEXT, district TEXT,
-          role TEXT DEFAULT 'student', birth_date TEXT, hide_birth_date INTEGER DEFAULT 0, bio TEXT,
-          heart_status TEXT DEFAULT 'Available', avatar_base64 TEXT, can_post_news INTEGER DEFAULT 0, password TEXT NOT NULL)""",
-        """CREATE TABLE IF NOT EXISTS posts(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
-          content TEXT, media_base64 TEXT, media_type TEXT, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
-        """CREATE TABLE IF NOT EXISTS comments(id SERIAL PRIMARY KEY, post_id INTEGER NOT NULL,
-          user_id INTEGER NOT NULL, parent_id INTEGER, content TEXT NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
-        """CREATE TABLE IF NOT EXISTS likes(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
-          post_id INTEGER NOT NULL, is_like INTEGER NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
-        "CREATE UNIQUE INDEX IF NOT EXISTS iup ON likes(user_id, post_id)",
-        """CREATE TABLE IF NOT EXISTS follows(follower_id INTEGER NOT NULL, following_id INTEGER NOT NULL,
-          PRIMARY KEY(follower_id, following_id))""",
-        """CREATE TABLE IF NOT EXISTS school_news(id SERIAL PRIMARY KEY, title TEXT NOT NULL,
-          author TEXT, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
-        """CREATE TABLE IF NOT EXISTS news_likes(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
-          news_id INTEGER NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
-        "CREATE UNIQUE INDEX IF NOT EXISTS iun ON news_likes(user_id, news_id)",
-        """CREATE TABLE IF NOT EXISTS news_comments(id SERIAL PRIMARY KEY, news_id INTEGER NOT NULL,
-          user_id INTEGER NOT NULL, content TEXT NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
-        """CREATE TABLE IF NOT EXISTS comment_likes(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
-          comment_id INTEGER NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
-        "CREATE UNIQUE INDEX IF NOT EXISTS iucl ON comment_likes(user_id, comment_id)",
-        """CREATE TABLE IF NOT EXISTS news_comment_likes(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
-          comment_id INTEGER NOT NULL, timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
-        "CREATE UNIQUE INDEX IF NOT EXISTS iuncl ON news_comment_likes(user_id, comment_id)",
-        """CREATE TABLE IF NOT EXISTS certificates(id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
-          title TEXT NOT NULL, image_base64 TEXT, verified INTEGER DEFAULT 1,
-          timestamp TEXT DEFAULT CURRENT_TIMESTAMP::text)""",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS university TEXT",
+        """IF OBJECT_ID('dbo.users','U') IS NULL
+        CREATE TABLE users(
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          username NVARCHAR(255) UNIQUE NOT NULL,
+          fullname NVARCHAR(255),
+          school_class NVARCHAR(255),
+          school_name NVARCHAR(255),
+          country NVARCHAR(255),
+          region NVARCHAR(255),
+          district NVARCHAR(255),
+          role NVARCHAR(50) DEFAULT 'student',
+          birth_date NVARCHAR(50),
+          hide_birth_date INT DEFAULT 0,
+          bio NVARCHAR(MAX),
+          heart_status NVARCHAR(50) DEFAULT 'Available',
+          avatar_base64 NVARCHAR(MAX),
+          can_post_news INT DEFAULT 0,
+          password NVARCHAR(255) NOT NULL
+        )""",
+        """IF OBJECT_ID('dbo.posts','U') IS NULL
+        CREATE TABLE posts(
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          user_id INT NOT NULL,
+          content NVARCHAR(MAX),
+          media_base64 NVARCHAR(MAX),
+          media_type NVARCHAR(50),
+          [timestamp] NVARCHAR(50) DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120)
+        )""",
+        """IF OBJECT_ID('dbo.comments','U') IS NULL
+        CREATE TABLE comments(
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          post_id INT NOT NULL,
+          user_id INT NOT NULL,
+          parent_id INT,
+          content NVARCHAR(MAX) NOT NULL,
+          [timestamp] NVARCHAR(50) DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120)
+        )""",
+        """IF OBJECT_ID('dbo.likes','U') IS NULL
+        CREATE TABLE likes(
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          user_id INT NOT NULL,
+          post_id INT NOT NULL,
+          is_like INT NOT NULL,
+          [timestamp] NVARCHAR(50) DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120)
+        )""",
+        """IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='iup' AND object_id=OBJECT_ID('likes'))
+        CREATE UNIQUE INDEX iup ON likes(user_id, post_id)""",
+        """IF OBJECT_ID('dbo.follows','U') IS NULL
+        CREATE TABLE follows(
+          follower_id INT NOT NULL,
+          following_id INT NOT NULL,
+          PRIMARY KEY(follower_id, following_id)
+        )""",
+        """IF OBJECT_ID('dbo.school_news','U') IS NULL
+        CREATE TABLE school_news(
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          title NVARCHAR(MAX) NOT NULL,
+          author NVARCHAR(255),
+          [timestamp] NVARCHAR(50) DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120)
+        )""",
+        """IF OBJECT_ID('dbo.news_likes','U') IS NULL
+        CREATE TABLE news_likes(
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          user_id INT NOT NULL,
+          news_id INT NOT NULL,
+          [timestamp] NVARCHAR(50) DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120)
+        )""",
+        """IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='iun' AND object_id=OBJECT_ID('news_likes'))
+        CREATE UNIQUE INDEX iun ON news_likes(user_id, news_id)""",
+        """IF OBJECT_ID('dbo.news_comments','U') IS NULL
+        CREATE TABLE news_comments(
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          news_id INT NOT NULL,
+          user_id INT NOT NULL,
+          content NVARCHAR(MAX) NOT NULL,
+          [timestamp] NVARCHAR(50) DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120)
+        )""",
+        """IF OBJECT_ID('dbo.comment_likes','U') IS NULL
+        CREATE TABLE comment_likes(
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          user_id INT NOT NULL,
+          comment_id INT NOT NULL,
+          [timestamp] NVARCHAR(50) DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120)
+        )""",
+        """IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='iucl' AND object_id=OBJECT_ID('comment_likes'))
+        CREATE UNIQUE INDEX iucl ON comment_likes(user_id, comment_id)""",
+        """IF OBJECT_ID('dbo.news_comment_likes','U') IS NULL
+        CREATE TABLE news_comment_likes(
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          user_id INT NOT NULL,
+          comment_id INT NOT NULL,
+          [timestamp] NVARCHAR(50) DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120)
+        )""",
+        """IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='iuncl' AND object_id=OBJECT_ID('news_comment_likes'))
+        CREATE UNIQUE INDEX iuncl ON news_comment_likes(user_id, comment_id)""",
+        """IF OBJECT_ID('dbo.certificates','U') IS NULL
+        CREATE TABLE certificates(
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          user_id INT NOT NULL,
+          title NVARCHAR(MAX) NOT NULL,
+          image_base64 NVARCHAR(MAX),
+          verified INT DEFAULT 1,
+          [timestamp] NVARCHAR(50) DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120)
+        )""",
+        """IF COL_LENGTH('dbo.users','university') IS NULL
+        ALTER TABLE users ADD university NVARCHAR(255)""",
     ]
+    # Fix up the [timestamp] DEFAULT on tables that already existed before
+    # this fix (they were created with GETDATE(), which on Azure SQL
+    # Database returns UTC time -- 5 hours behind O'zbekiston/Tashkent
+    # time, which is exactly the "vaqt noto'g'ri" bug this patches). Brand
+    # new tables already get the corrected DEFAULT from the CREATE TABLE
+    # statements above; this loop repairs tables created before the fix.
+    # It's a no-op (guarded by the LIKE '%DATEADD%' check) once a table's
+    # default has already been corrected, so it's safe to run on every
+    # startup.
+    _TS_TABLES = ["posts", "comments", "likes", "school_news", "news_likes",
+                  "news_comments", "comment_likes", "news_comment_likes", "certificates"]
+    for tbl in _TS_TABLES:
+        statements.append(f"""
+        IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('dbo.{tbl}') AND name='timestamp')
+           AND NOT EXISTS (
+             SELECT 1 FROM sys.default_constraints dc
+             JOIN sys.columns col ON col.object_id=dc.parent_object_id AND col.column_id=dc.parent_column_id
+             WHERE dc.parent_object_id=OBJECT_ID('dbo.{tbl}') AND col.name='timestamp' AND dc.definition LIKE '%DATEADD%'
+           )
+        BEGIN
+          DECLARE @cn NVARCHAR(200);
+          SELECT @cn = dc.name FROM sys.default_constraints dc
+          JOIN sys.columns col ON col.object_id=dc.parent_object_id AND col.column_id=dc.parent_column_id
+          WHERE dc.parent_object_id=OBJECT_ID('dbo.{tbl}') AND col.name='timestamp';
+          IF @cn IS NOT NULL EXEC('ALTER TABLE {tbl} DROP CONSTRAINT ' + @cn);
+          EXEC('ALTER TABLE {tbl} ADD DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120) FOR [timestamp]');
+        END""")
     # Each statement runs on its own so one failure (e.g. a stale/partial
-    # previous deploy) can never block the rest of the schema from being
+    # previous deploy, or a table the migration already created slightly
+    # differently) can never block the rest of the schema from being
     # created -- and any real error is printed to the Render logs instead
     # of silently aborting the whole batch.
     for stmt in statements:
@@ -148,10 +312,84 @@ def init():
                 c._conn.rollback()
             except Exception:
                 pass
+
+    # One-time data fix: shift already-stored [timestamp] values +5 hours
+    # to correct historic rows that were inserted while the DEFAULT still
+    # used GETDATE() (Azure SQL Database always runs in UTC, 5 hours behind
+    # O'zbekiston/Tashkent time). Guarded by a tiny migrations table so
+    # this can never be re-applied on a later restart and shift times
+    # twice.
+    try:
+        c.execute("""IF OBJECT_ID('dbo.schema_migrations','U') IS NULL
+            CREATE TABLE schema_migrations(name NVARCHAR(200) PRIMARY KEY, applied_at DATETIME DEFAULT GETUTCDATE())""")
+        c.commit()
+        already = c.execute(
+            "SELECT 1 FROM schema_migrations WHERE name=?", ("ts_tashkent_utc5_fix",)
+        ).fetchone()
+        if not already:
+            for tbl in _TS_TABLES:
+                try:
+                    c.execute(f"""UPDATE {tbl} SET [timestamp] = CONVERT(VARCHAR(19),
+                        DATEADD(HOUR, 5, CONVERT(DATETIME, [timestamp], 120)), 120)
+                        WHERE [timestamp] IS NOT NULL AND ISDATE([timestamp]) = 1""")
+                    c.commit()
+                except Exception as e:
+                    print(f"[init] one-time timestamp fix failed for {tbl} (continuing): {e}")
+                    try:
+                        c._conn.rollback()
+                    except Exception:
+                        pass
+            c.execute("INSERT INTO schema_migrations(name) VALUES(?)", ("ts_tashkent_utc5_fix",))
+            c.commit()
+    except Exception as e:
+        print(f"[init] migrations bookkeeping failed (continuing): {e}")
+        try:
+            c._conn.rollback()
+        except Exception:
+            pass
+
     c.commit(); c.close()
 
 
 init()
+
+
+# ---------------------------------------------------------------------------
+# Cloudflare R2 (S3-compatible) object storage -- used for ALL images (post
+# media, avatars, certificate photos). Text/post data stays in Azure SQL;
+# only the raw image bytes live in R2, so the database never has to store
+# or transfer big base64 blobs. The users/posts/certificates columns that
+# used to hold raw base64 image data (avatar_base64, media_base64,
+# image_base64) hold a plain R2 URL string instead -- column names were
+# left as-is so the DB schema didn't need extra changes, only what's
+# stored in them.
+#
+# Set these in your host's Environment settings, never commit real keys:
+#   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT_URL,
+#   R2_PUBLIC_URL, R2_BUCKET_NAME
+# ---------------------------------------------------------------------------
+R2_ACCESS_KEY = os.environ.get("R2_ACCESS_KEY_ID")
+R2_SECRET_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
+R2_ENDPOINT = os.environ.get("R2_ENDPOINT_URL")
+R2_PUBLIC_URL = (os.environ.get("R2_PUBLIC_URL") or "").rstrip("/")
+R2_BUCKET = os.environ.get("R2_BUCKET_NAME", "chalker")
+
+_r2 = None
+if R2_ACCESS_KEY and R2_SECRET_KEY and R2_ENDPOINT:
+    _r2 = boto3.client(
+        "s3",
+        endpoint_url=R2_ENDPOINT,
+        aws_access_key_id=R2_ACCESS_KEY,
+        aws_secret_access_key=R2_SECRET_KEY,
+        config=_BotoConfig(signature_version="s3v4"),
+        region_name="auto",
+    )
+
+# Images are compressed to JPEG client-side (max ~1280px) before upload, so
+# 8MB is a generous ceiling -- this just guards direct API hits.
+IMAGE_ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+IMAGE_MAX_SIZE = 8 * 1024 * 1024  # 8 MB
+IMAGE_LIMIT_MSG = "Rasm hajmi 8MB dan oshmasligi va faqat (jpg, png, gif, webp) formatda bo'lishi kerak!"
 
 
 def pub(r):
@@ -235,7 +473,7 @@ def register(username: str = Form(...), fullname: str = Form(...), password: str
     c = db()
     if c.execute("SELECT id FROM users WHERE username=?", (u,)).fetchone():
         c.close(); return err("Bu username band!")
-    cur = c.execute("INSERT INTO users(username,fullname,password) VALUES(?,?,?) RETURNING id", (u, fullname.strip(), password))
+    cur = c.execute("INSERT INTO users(username,fullname,password) OUTPUT INSERTED.id VALUES(?,?,?)", (u, fullname.strip(), password))
     new_id = cur.fetchone()["id"]
     c.commit(); r = urow(c, new_id); c.close()
     return {"user": pub(r)}
@@ -365,6 +603,36 @@ def certificate_self_delete(b: CertSelfDel):
     c.execute("DELETE FROM certificates WHERE id=?", (b.cert_id,))
     c.commit(); c.close(); return {"success": True}
 
+@app.post("/api/upload/image")
+async def upload_image(file: UploadFile = File(...)):
+    """Generic image upload used for post media, avatars, and certificate
+    photos. Uploads the raw bytes straight to R2 and returns the public
+    URL -- the caller then stores that URL in whichever *_base64 column it
+    used to store the raw base64 data in (see the R2 comment block above)."""
+    try:
+        if _r2 is None:
+            return err("Fayl xizmati sozlanmagan: R2 kalitlari (.env) topilmadi!", 500)
+        orig_name = file.filename or "rasm.jpg"
+        ext = os.path.splitext(orig_name)[1].lower()
+        if ext not in IMAGE_ALLOWED_EXT:
+            # Browser-generated blobs (canvas.toBlob) often arrive without a
+            # clean filename/extension -- default to jpg since that's what
+            # the frontend's image compressor always outputs.
+            ext = ".jpg"
+        data = await file.read()
+        if len(data) > IMAGE_MAX_SIZE:
+            return err(IMAGE_LIMIT_MSG, 400)
+        key = f"images/{uuid.uuid4().hex}{ext}"
+        _r2.put_object(
+            Bucket=R2_BUCKET,
+            Key=key,
+            Body=data,
+            ContentType=file.content_type or "image/jpeg",
+        )
+        return {"url": f"{R2_PUBLIC_URL}/{key}"}
+    except Exception as e:
+        return err(f"Kutilmagan xatolik: {e}", 500)
+
 @app.post("/api/posts/create")
 def post_create(b: PostCreate):
     if not b.content.strip() and not b.media_base64: return err("Post bo'sh!")
@@ -395,7 +663,7 @@ def post_delete(b: PostDel):
 def posts(user_id: Optional[int] = None, author: Optional[str] = None):
     v = user_id if user_id is not None else -1
     c = db()
-    sql = """SELECT p.id,p.user_id,p.content,p.media_base64,p.media_type,p.timestamp,
+    sql = """SELECT p.id,p.user_id,p.content,p.media_base64,p.media_type,p.[timestamp],
         u.username,u.fullname,u.avatar_base64,u.can_post_news,
         (SELECT COUNT(*) FROM likes l WHERE l.post_id=p.id AND l.is_like=1) likes_count,
         (SELECT COUNT(*) FROM comments cm WHERE cm.post_id=p.id) comments_count,
@@ -415,10 +683,10 @@ def post_like(b: LikeReq):
     r = c.execute("SELECT is_like FROM likes WHERE user_id=? AND post_id=?", (b.user_id, b.post_id)).fetchone()
     if r and r["is_like"] == b.is_like:
         c.execute("DELETE FROM likes WHERE user_id=? AND post_id=?", (b.user_id, b.post_id)); liked = False
+    elif r:
+        c.execute("UPDATE likes SET is_like=? WHERE user_id=? AND post_id=?", (b.is_like, b.user_id, b.post_id)); liked = True
     else:
-        c.execute("""INSERT INTO likes(user_id,post_id,is_like) VALUES(?,?,?)
-                  ON CONFLICT (user_id,post_id) DO UPDATE SET is_like=EXCLUDED.is_like""",
-                  (b.user_id, b.post_id, b.is_like)); liked = True
+        c.execute("INSERT INTO likes(user_id,post_id,is_like) VALUES(?,?,?)", (b.user_id, b.post_id, b.is_like)); liked = True
     c.commit(); c.close(); return {"liked": liked}
 
 @app.post("/api/comments/create")
@@ -433,7 +701,7 @@ def comment_create(b: CommentCreate):
 def comments(post_id: int, viewer_id: Optional[int] = None):
     v = viewer_id if viewer_id is not None else -1
     c = db()
-    rows = c.execute("""SELECT c.id,c.parent_id,c.content,c.timestamp,u.username,u.fullname,
+    rows = c.execute("""SELECT c.id,c.parent_id,c.content,c.[timestamp],u.username,u.fullname,
         u.avatar_base64,u.can_post_news,
         (SELECT COUNT(*) FROM comment_likes cl WHERE cl.comment_id=c.id) likes_count,
         (SELECT 1 FROM comment_likes cl WHERE cl.comment_id=c.id AND cl.user_id=?) my_like
@@ -470,10 +738,10 @@ def search(q: str = "", viewer_id: Optional[int] = None):
     c = db()
     like = f"%{q}%"
     v = viewer_id if viewer_id is not None else -1
-    rows = c.execute("""SELECT id,username,fullname,avatar_base64,can_post_news,school_name,
+    rows = c.execute("""SELECT TOP 25 id,username,fullname,avatar_base64,can_post_news,school_name,
         (SELECT 1 FROM follows WHERE follower_id=? AND following_id=users.id) is_following
-        FROM users WHERE username ILIKE ? OR fullname ILIKE ?
-        ORDER BY (username ILIKE ?) DESC, username ASC LIMIT 25""",
+        FROM users WHERE username LIKE ? OR fullname LIKE ?
+        ORDER BY CASE WHEN username LIKE ? THEN 0 ELSE 1 END, username ASC""",
         (v, like, like, q + "%")).fetchall()
     c.close()
     return [{**dict(r), "is_following": bool(r["is_following"])} for r in rows]
@@ -517,11 +785,11 @@ def news_delete(b: NewsDel):
 def news(user_id: Optional[int] = None):
     v = user_id if user_id is not None else -1
     c = db()
-    rows = c.execute("""SELECT n.*,
+    rows = c.execute("""SELECT TOP 20 n.*,
         (SELECT COUNT(*) FROM news_likes l WHERE l.news_id=n.id) likes_count,
         (SELECT COUNT(*) FROM news_comments m WHERE m.news_id=n.id) comments_count,
         (SELECT 1 FROM news_likes l WHERE l.news_id=n.id AND l.user_id=?) my_like
-        FROM school_news n ORDER BY n.id DESC LIMIT 20""", (v,)).fetchall()
+        FROM school_news n ORDER BY n.id DESC""", (v,)).fetchall()
     c.close(); return [dict(r) for r in rows]
 
 @app.post("/api/news/like")
@@ -545,7 +813,7 @@ def news_comment(b: NewsComment):
 def news_comments(news_id: int, viewer_id: Optional[int] = None):
     v = viewer_id if viewer_id is not None else -1
     c = db()
-    rows = c.execute("""SELECT m.id,m.content,m.timestamp,u.username,u.fullname,u.avatar_base64,u.can_post_news,
+    rows = c.execute("""SELECT m.id,m.content,m.[timestamp],u.username,u.fullname,u.avatar_base64,u.can_post_news,
         (SELECT COUNT(*) FROM news_comment_likes cl WHERE cl.comment_id=m.id) likes_count,
         (SELECT 1 FROM news_comment_likes cl WHERE cl.comment_id=m.id AND cl.user_id=?) my_like
         FROM news_comments m JOIN users u ON u.id=m.user_id WHERE m.news_id=? ORDER BY m.id ASC""",
@@ -577,17 +845,17 @@ def news_comment_delete(b: NewsCommentDel):
 def notifications(user_id: int):
     c = db()
     out = []
-    for r in c.execute("""SELECT l.timestamp ts, u.username, u.fullname, p.content snippet FROM likes l
+    for r in c.execute("""SELECT TOP 10 l.[timestamp] ts, u.username, u.fullname, p.content snippet FROM likes l
         JOIN posts p ON p.id=l.post_id JOIN users u ON u.id=l.user_id
-        WHERE p.user_id=? AND l.user_id!=? AND l.is_like=1 ORDER BY l.id DESC LIMIT 10""",
+        WHERE p.user_id=? AND l.user_id!=? AND l.is_like=1 ORDER BY l.id DESC""",
         (user_id, user_id)).fetchall():
         out.append({"type": "like", **dict(r)})
-    for r in c.execute("""SELECT m.timestamp ts, u.username, u.fullname, m.content snippet FROM comments m
+    for r in c.execute("""SELECT TOP 10 m.[timestamp] ts, u.username, u.fullname, m.content snippet FROM comments m
         JOIN posts p ON p.id=m.post_id JOIN users u ON u.id=m.user_id
-        WHERE p.user_id=? AND m.user_id!=? ORDER BY m.id DESC LIMIT 10""",
+        WHERE p.user_id=? AND m.user_id!=? ORDER BY m.id DESC""",
         (user_id, user_id)).fetchall():
         out.append({"type": "comment", **dict(r)})
-    for r in c.execute("SELECT timestamp ts, author username, author fullname, title snippet FROM school_news ORDER BY id DESC LIMIT 5").fetchall():
+    for r in c.execute("SELECT TOP 5 [timestamp] ts, author username, author fullname, title snippet FROM school_news ORDER BY id DESC").fetchall():
         out.append({"type": "news", **dict(r)})
     c.close()
     out.sort(key=lambda x: x["ts"] or "", reverse=True)
