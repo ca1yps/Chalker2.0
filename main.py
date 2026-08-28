@@ -124,11 +124,34 @@ class Conn:
     def __init__(self):
         self._conn = _get_conn()
         self._returned = False
+        self._broken = False
 
     def execute(self, sql, params=()):
-        cur = self._conn.cursor()
-        cur.execute(sql, tuple(params))
-        return _CursorWrap(cur)
+        try:
+            cur = self._conn.cursor()
+            cur.execute(sql, tuple(params))
+            return _CursorWrap(cur)
+        except pyodbc.Error:
+            # The pooled connection is stale -- Azure SQL (or a firewall in
+            # between) closed it after sitting idle, so the next query on it
+            # fails with things like '08S01 Communication link failure'.
+            # Drop it and retry once on a brand new connection instead of
+            # bubbling up a 500 for something a reconnect fixes.
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            try:
+                self._conn = _new_conn()
+                cur = self._conn.cursor()
+                cur.execute(sql, tuple(params))
+                return _CursorWrap(cur)
+            except Exception:
+                # Retry also failed -- this is a real error (bad SQL, DB
+                # down, etc), not just a stale connection. Mark the
+                # connection broken so it isn't handed back to the pool.
+                self._broken = True
+                raise
 
     def commit(self):
         self._conn.commit()
@@ -139,6 +162,12 @@ class Conn:
         if self._returned:
             return
         self._returned = True
+        if self._broken:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            return
         try:
             self._conn.rollback()
         except Exception:
