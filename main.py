@@ -1,5 +1,6 @@
 import os
 import queue
+import re
 import threading
 import uuid
 from typing import Optional
@@ -402,6 +403,12 @@ def news_rights(r):
     return bool(r and (r["username"] == "boss" or r["can_post_news"] == 1))
 def clean_u(u):
     return u.strip().lower().lstrip("@")
+# Username rule: at least 5 characters, letters/digits/underscore/dot only
+# (no spaces or other symbols).
+_USERNAME_RE = re.compile(r"^[a-z0-9_.]{5,}$")
+_USERNAME_ERR = "Username kamida 5 belgidan iborat bo'lishi va faqat harf, raqam, \"_\" va \".\" belgilaridan tashkil topishi kerak!"
+def valid_username(u):
+    return bool(_USERNAME_RE.match(u or ""))
 
 class PostCreate(BaseModel):
     user_id: int; content: str = ""; media_base64: Optional[str] = None; media_type: Optional[str] = None
@@ -427,6 +434,10 @@ class NewsComment(BaseModel):
     user_id: int; news_id: int; content: str
 class RightsReq(BaseModel):
     boss_id: int; target_username: str
+class DeleteUserReq(BaseModel):
+    boss_id: int; target_username: str
+class RemoveFollowerReq(BaseModel):
+    owner_id: int; follower_username: str
 class CommentDel(BaseModel):
     user_id: int; comment_id: int
 class NewsCommentDel(BaseModel):
@@ -469,10 +480,13 @@ def check_username(username: str, exclude_id: Optional[int] = None):
 def register(username: str = Form(...), fullname: str = Form(...), password: str = Form(...)):
     u = clean_u(username)
     if not u or not password: return err("Username va parol majburiy!")
-    if len(password) < 4: return err("Parol kamida 4 belgi!")
     c = db()
     if c.execute("SELECT id FROM users WHERE username=?", (u,)).fetchone():
         c.close(); return err("Bu username band!")
+    if not valid_username(u):
+        c.close(); return err(_USERNAME_ERR)
+    if len(password) < 4:
+        c.close(); return err("Parol kamida 4 belgi!")
     cur = c.execute("INSERT INTO users(username,fullname,password) OUTPUT INSERTED.id VALUES(?,?,?)", (u, fullname.strip(), password))
     new_id = cur.fetchone()["id"]
     c.commit(); r = urow(c, new_id); c.close()
@@ -495,6 +509,8 @@ def account(user_id: int = Form(...), current_password: str = Form(...),
     if nu and nu != r["username"]:
         if c.execute("SELECT id FROM users WHERE username=?", (nu,)).fetchone():
             c.close(); return err("Bu username band!")
+        if not valid_username(nu):
+            c.close(); return err(_USERNAME_ERR)
         c.execute("UPDATE users SET username=? WHERE id=?", (nu, user_id))
     if new_password:
         if len(new_password) < 4: c.close(); return err("Yangi parol kamida 4 belgi!")
@@ -870,6 +886,55 @@ def rights(b: RightsReq):
     nv = 0 if tg["can_post_news"] == 1 else 1
     c.execute("UPDATE users SET can_post_news=? WHERE id=?", (nv, tg["id"]))
     c.commit(); c.close(); return {"granted": bool(nv)}
+
+@app.post("/api/admin/delete_user")
+def admin_delete_user(b: DeleteUserReq):
+    """Boss-only: permanently removes a user and every row that references
+    them (posts, comments, likes, follows, certificates, ...) so no orphaned
+    data is left behind."""
+    c = db(); boss = urow(c, b.boss_id)
+    if not boss or boss["username"] != "boss": c.close(); return err("Faqat @boss!", 403)
+    tu = clean_u(b.target_username)
+    if tu == "boss": c.close(); return err("@boss akkountini o'chirib bo'lmaydi!")
+    tg = c.execute("SELECT id FROM users WHERE username=?", (tu,)).fetchone()
+    if not tg: c.close(); return err("Foydalanuvchi topilmadi!", 404)
+    uid = tg["id"]
+    try:
+        post_ids = [r["id"] for r in c.execute("SELECT id FROM posts WHERE user_id=?", (uid,)).fetchall()]
+        for pid in post_ids:
+            c.execute("DELETE FROM likes WHERE post_id=?", (pid,))
+            c.execute("DELETE FROM comments WHERE post_id=?", (pid,))
+        c.execute("DELETE FROM posts WHERE user_id=?", (uid,))
+        cm_ids = [r["id"] for r in c.execute("SELECT id FROM comments WHERE user_id=?", (uid,)).fetchall()]
+        for cid in cm_ids:
+            c.execute("DELETE FROM comment_likes WHERE comment_id=?", (cid,))
+        c.execute("DELETE FROM comments WHERE user_id=?", (uid,))
+        c.execute("DELETE FROM likes WHERE user_id=?", (uid,))
+        c.execute("DELETE FROM comment_likes WHERE user_id=?", (uid,))
+        nc_ids = [r["id"] for r in c.execute("SELECT id FROM news_comments WHERE user_id=?", (uid,)).fetchall()]
+        for ncid in nc_ids:
+            c.execute("DELETE FROM news_comment_likes WHERE comment_id=?", (ncid,))
+        c.execute("DELETE FROM news_comments WHERE user_id=?", (uid,))
+        c.execute("DELETE FROM news_likes WHERE user_id=?", (uid,))
+        c.execute("DELETE FROM news_comment_likes WHERE user_id=?", (uid,))
+        c.execute("DELETE FROM certificates WHERE user_id=?", (uid,))
+        c.execute("DELETE FROM follows WHERE follower_id=? OR following_id=?", (uid, uid))
+        c.execute("DELETE FROM users WHERE id=?", (uid,))
+        c.commit()
+    except Exception as e:
+        try: c._conn.rollback()
+        except Exception: pass
+        c.close(); return err(f"O'chirishda xatolik: {e}", 500)
+    c.close(); return {"success": True}
+
+@app.post("/api/users/remove_follower")
+def remove_follower(b: RemoveFollowerReq):
+    """Lets a user forcibly remove someone from their own followers list."""
+    c = db()
+    fu = c.execute("SELECT id FROM users WHERE username=?", (clean_u(b.follower_username),)).fetchone()
+    if not fu: c.close(); return err("Topilmadi!", 404)
+    c.execute("DELETE FROM follows WHERE follower_id=? AND following_id=?", (fu["id"], b.owner_id))
+    c.commit(); c.close(); return {"success": True}
 
 if __name__ == "__main__":
     import uvicorn
