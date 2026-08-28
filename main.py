@@ -65,14 +65,17 @@ def _new_conn():
     return pyodbc.connect(AZURE_CONN_STR, autocommit=False)
 
 
-def _new_conn_with_retry(retries=6, delay=5):
-    """Used only at startup. A free/serverless Azure SQL database can be
-    paused and take tens of seconds to resume, which makes the very first
-    login attempt fail with '08S01/HYT00 Login timeout expired' and crashes
-    the whole app on deploy. Retry a few times with a short delay instead of
-    giving up immediately -- this does NOT help if the real cause is a
-    firewall blocking Render's IP (that will just fail every attempt and
-    still raise after retries are exhausted)."""
+def _new_conn_with_retry(retries=10, delay=8):
+    """Used only at startup. A free/serverless Azure SQL database auto-pauses
+    after a period of inactivity and can take well over 30 seconds to resume,
+    which makes the very first login attempt fail with either
+    '08S01/HYT00 Login timeout expired' or the more specific
+    '(40613) Database ... is not currently available. Please retry the
+    connection later' -- Microsoft's own documented signal that the database
+    is mid-resume. Retry with a delay instead of crashing the whole app on
+    deploy. This does NOT help if the real cause is a firewall blocking
+    Render's IP (every attempt will fail the same way and this still raises
+    once retries are exhausted)."""
     last_err = None
     for attempt in range(1, retries + 1):
         try:
@@ -516,6 +519,23 @@ class CertSelfDel(BaseModel):
 @app.get("/ping")
 def ping():
     return "OK"
+
+@app.get("/ping-db")
+def ping_db():
+    """Hit this from an external cron service (e.g. cron-job.org) every
+    30-45 minutes. Azure's free/serverless SQL tier auto-pauses after around
+    an hour of no database activity -- '/ping' above never touches the
+    database, so it does nothing to prevent that. A real (tiny) query here
+    keeps the database from pausing during normal usage hours."""
+    try:
+        c = db()
+        try:
+            c.execute("SELECT 1").fetchall()
+        finally:
+            c.close()
+        return "OK"
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=503)
 
 @app.get("/", response_class=HTMLResponse)
 def index():
