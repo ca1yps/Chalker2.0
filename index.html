@@ -717,7 +717,11 @@ async function loadCmts(id){var box=$("cl-"+id);if(!box||box.dataset.busy==="1")
   '<div class="flex items-center gap-2 mt-1">'+
   '<button id="clk-'+c.id+'" onclick="cmtReact('+c.id+',false)" class="stk cstk stk-like'+(c.likes_count>0&&c.my_like?' on':'')+'">'+(c.my_like?HF:HO)+' '+(c.likes_count||0)+'</button>'+
   '<button onclick="setRep('+id+','+c.id+',\''+c.username+'\')" class="text-xs text-gray-500 hover:text-white font-semibold">'+t("rpl")+'</button>'+delBtn+'</div></div></div></div>'}
- var h="";l.forEach(function(c){if(!c.parent_id){h+=one(c,false);l.forEach(function(r){if(r.parent_id===c.id)h+=one(r,true)})}});
+ var byId={};l.forEach(function(c){byId[c.id]=c});
+ function rootOf(c){var cur=c,guard=0;while(cur.parent_id&&byId[cur.parent_id]&&guard++<50){cur=byId[cur.parent_id]}return cur}
+ var groups={},order=[];
+ l.forEach(function(c){var root=rootOf(c);if(!groups[root.id]){groups[root.id]=[];order.push(root.id)}if(c.id!==root.id)groups[root.id].push(c)});
+ var h="";order.forEach(function(rid){h+=one(byId[rid],false);groups[rid].forEach(function(r){h+=one(r,true)})});
  box.innerHTML=h||'<p class="text-gray-600 text-xs">'+t("fc")+'</p>'}
  catch(e){box.innerHTML='<p class="text-red-400 text-xs cursor-pointer" onclick="loadCmts('+id+')">'+(e.message||"Xato")+' · \u21bb</p>'}
  finally{box.dataset.busy="0"}}
