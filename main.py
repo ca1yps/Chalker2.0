@@ -2,6 +2,7 @@ import os
 import queue
 import re
 import threading
+import time
 import uuid
 from typing import Optional
 
@@ -62,6 +63,25 @@ _pool_created = 0
 
 def _new_conn():
     return pyodbc.connect(AZURE_CONN_STR, autocommit=False)
+
+
+def _new_conn_with_retry(retries=6, delay=5):
+    """Used only at startup. A free/serverless Azure SQL database can be
+    paused and take tens of seconds to resume, which makes the very first
+    login attempt fail with '08S01/HYT00 Login timeout expired' and crashes
+    the whole app on deploy. Retry a few times with a short delay instead of
+    giving up immediately -- this does NOT help if the real cause is a
+    firewall blocking Render's IP (that will just fail every attempt and
+    still raise after retries are exhausted)."""
+    last_err = None
+    for attempt in range(1, retries + 1):
+        try:
+            return pyodbc.connect(AZURE_CONN_STR, autocommit=False)
+        except pyodbc.Error as e:
+            last_err = e
+            if attempt < retries:
+                time.sleep(delay)
+    raise last_err
 
 
 def _get_conn():
@@ -191,6 +211,15 @@ def db():
 
 
 def init():
+    # Warm up the pool with one connection that retries on failure, so a
+    # slow-to-resume Azure SQL database gets a chance to wake up instead of
+    # crashing the whole app the moment `uvicorn` imports this module.
+    global _pool_created
+    if _pool_created == 0:
+        with _pool_lock:
+            if _pool_created == 0:
+                _pool.put_nowait(_new_conn_with_retry())
+                _pool_created = 1
     c = db()
     statements = [
         """IF OBJECT_ID('dbo.users','U') IS NULL
