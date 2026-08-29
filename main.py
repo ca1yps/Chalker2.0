@@ -1,14 +1,13 @@
 import os
-import queue
 import re
-import threading
 import time
 import uuid
 from typing import Optional
 
 import boto3
 from botocore.client import Config as _BotoConfig
-import oracledb
+import psycopg2
+from psycopg2 import pool as _pgpool
 
 from fastapi import FastAPI, Form, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,26 +15,17 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 # ---------------------------------------------------------------------------
-# Database connection (Oracle Autonomous Database, via python-oracledb)
+# Database connection (CockroachDB, via psycopg2 -- CockroachDB speaks the
+# PostgreSQL wire protocol, so the standard Postgres driver works as-is)
 # ---------------------------------------------------------------------------
-# Set these in your host's Environment settings (Render -> Environment),
-# never commit real credentials into the repo / git history.
-#   ORACLE_DB_USER      e.g. ADMIN
-#   ORACLE_DB_PASSWORD  your Autonomous DB password
-#   ORACLE_DB_DSN       the connect descriptor from Oracle Cloud (Database
-#                        Connection -> "Connection String", *_high service)
-#
-# This uses TLS + server-DN-match (no wallet file needed) exactly like the
-# quickstart script Oracle Cloud gave you -- python-oracledb's default
-# "thin" mode speaks this natively, no Oracle Instant Client install
-# required on Render.
-ORACLE_USER = os.getenv("ORACLE_DB_USER", "ADMIN")
-ORACLE_PASSWORD = os.getenv("ORACLE_DB_PASSWORD", "Ilyo$6eey06072009")
-ORACLE_DSN = os.getenv(
-    "ORACLE_DB_DSN",
-    "(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)"
-    "(host=adb.eu-frankfurt-1.oraclecloud.com))(connect_data=(service_name="
-    "gae728d589dd162_chalkerdb_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))",
+# Set DATABASE_URL in your host's Environment settings (Render ->
+# Environment), never commit the real password into the repo / git history.
+# It must include sslmode=verify-full and point at the CA cert file (see the
+# deployment notes for how that file gets onto Render). Example shape:
+#   postgresql://ilyosbe:<PAROL>@winged-bison-19941.jxf.gcp-europe-west3.cockroachlabs.cloud:26257/defaultdb?sslmode=verify-full&sslrootcert=/etc/secrets/cc-ca.crt
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://ilyosbe:PASSWORD@winged-bison-19941.jxf.gcp-europe-west3.cockroachlabs.cloud:26257/defaultdb?sslmode=verify-full",
 )
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -49,49 +39,26 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 
 
 # ---------------------------------------------------------------------------
-# Oracle connection pool
+# Connection pool
 # ---------------------------------------------------------------------------
-# Unlike pyodbc, python-oracledb ships its own thread-safe pool
-# (oracledb.create_pool), so there's no need to hand-roll one with a
-# queue.Queue like the Azure SQL version did. The pool also has a built-in
-# "ping_interval" (default 60s): a connection that's been idle longer than
-# that is silently validated/reconnected before being handed to a request,
-# which is what fixes the "stale connection -> Communication link failure"
-# class of bug we kept hitting on Azure.
+# psycopg2 ships a real thread-safe pool (psycopg2.pool.ThreadedConnectionPool),
+# so -- unlike the Azure SQL/pyodbc version -- there's no need to hand-roll
+# one with a queue.Queue.
 # ---------------------------------------------------------------------------
 _POOL_SIZE = 5
 
 
-def _clob_output_type_handler(cursor, metadata):
-    # Auto-convert CLOB/NCLOB columns to plain Python strings on fetch
-    # instead of LOB locator objects, which (a) need an explicit .read()
-    # call and (b) can't be JSON-serialized directly by FastAPI.
-    if metadata.type_code in (oracledb.DB_TYPE_CLOB, oracledb.DB_TYPE_NCLOB):
-        return cursor.var(oracledb.DB_TYPE_LONG, arraysize=cursor.arraysize)
-    if metadata.type_code is oracledb.DB_TYPE_BLOB:
-        return cursor.var(oracledb.DB_TYPE_LONG_RAW, arraysize=cursor.arraysize)
-    return None
-
-
-def _new_pool_with_retry(retries=10, delay=8):
-    """Oracle Autonomous DB (Always Free) doesn't auto-pause the way
-    Azure's serverless tier does, but the very first connection right
-    after a fresh deploy can still occasionally hit a transient
-    network/TLS hiccup. Retry a few times instead of crashing the whole
-    app on deploy."""
+def _new_pool_with_retry(retries=10, delay=6):
+    """CockroachDB Cloud (Basic/Serverless free tier) doesn't force-pause
+    the way Azure's serverless SQL tier does, but the very first connection
+    right after a fresh deploy can still occasionally hit a transient
+    network/TLS hiccup. Retry a few times instead of crashing the whole app
+    on deploy."""
     last_err = None
     for attempt in range(1, retries + 1):
         try:
-            return oracledb.create_pool(
-                user=ORACLE_USER,
-                password=ORACLE_PASSWORD,
-                dsn=ORACLE_DSN,
-                min=1,
-                max=_POOL_SIZE,
-                increment=1,
-                ping_interval=60,
-            )
-        except oracledb.Error as e:
+            return _pgpool.ThreadedConnectionPool(1, _POOL_SIZE, dsn=DATABASE_URL)
+        except psycopg2.Error as e:
             last_err = e
             if attempt < retries:
                 time.sleep(delay)
@@ -100,36 +67,28 @@ def _new_pool_with_retry(retries=10, delay=8):
 
 _pool = _new_pool_with_retry()
 
-_QMARK_RE = re.compile(r"\?")
 
-
-def _qmark_to_oracle(sql):
-    """python-oracledb has no '?' placeholder support like pyodbc/sqlite3
-    -- it uses numbered binds (':1', ':2', ...). Translating here means
-    every query string elsewhere in this file could stay exactly as
-    written, with the same '?' placeholders as before."""
-    counter = [0]
-
-    def _repl(_m):
-        counter[0] += 1
-        return f":{counter[0]}"
-
-    return _QMARK_RE.sub(_repl, sql)
+def _qmark_to_pg(sql):
+    """psycopg2 uses '%s' placeholders instead of pyodbc/sqlite3's '?' --
+    translating here means every query string elsewhere in this file could
+    stay exactly as written."""
+    return sql.replace("?", "%s")
 
 
 class _CursorWrap:
-    """Wraps an oracledb cursor so fetchone()/fetchall() return plain
-    dicts keyed by lowercase column name. Oracle uppercases unquoted
-    identifiers internally (USERNAME, CAN_POST_NEWS, ...), but the rest of
-    this file was written expecting lowercase keys (r["username"],
-    dict(r), etc) -- lowercasing here means none of that code needed to
-    change."""
+    """Wraps a psycopg2 cursor so fetchone()/fetchall() return plain dicts
+    keyed by column name -- psycopg2 cursors only support index access by
+    default, but the rest of this file was written expecting
+    RealDictCursor-style dict rows (r["colname"], dict(r), etc). Postgres
+    (and CockroachDB) already return unquoted identifiers in lowercase
+    exactly as written in the query, so no case-normalizing is needed
+    here (unlike the Oracle attempt, which uppercases everything)."""
 
     def __init__(self, cur):
         self._cur = cur
 
     def _cols(self):
-        return [d[0].lower() for d in self._cur.description] if self._cur.description else []
+        return [d[0] for d in self._cur.description] if self._cur.description else []
 
     def fetchone(self):
         row = self._cur.fetchone()
@@ -145,30 +104,43 @@ class _CursorWrap:
 class Conn:
     """Thin wrapper so the rest of the file can keep using the same
     sqlite3-style pattern: c.execute(sql, params).fetchone()/.fetchall(),
-    c.commit(), c.close() -- but talking to Oracle underneath via
-    python-oracledb, borrowing a connection from the pool for the
-    lifetime of one request."""
+    c.commit(), c.close() -- but talking to CockroachDB underneath via
+    psycopg2, borrowing a connection from the pool for the lifetime of one
+    request."""
 
     def __init__(self):
-        self._conn = _pool.acquire()
-        self._conn.outputtypehandler = _clob_output_type_handler
+        self._conn = _pool.getconn()
         self._returned = False
+        self._broken = False
 
     def execute(self, sql, params=()):
-        cur = self._conn.cursor()
-        cur.execute(_qmark_to_oracle(sql), tuple(params))
-        return _CursorWrap(cur)
+        try:
+            cur = self._conn.cursor()
+            cur.execute(_qmark_to_pg(sql), tuple(params))
+            return _CursorWrap(cur)
+        except psycopg2.Error:
+            # The pooled connection dropped/went stale. Open a fresh
+            # standalone connection for the rest of this request instead
+            # of bubbling up a 500 for something a reconnect fixes. It's
+            # closed (not returned to the pool) when the request finishes,
+            # since the pool only tracks connections it handed out itself.
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            self._broken = True
+            self._conn = psycopg2.connect(DATABASE_URL)
+            cur = self._conn.cursor()
+            cur.execute(_qmark_to_pg(sql), tuple(params))
+            return _CursorWrap(cur)
 
     def execute_insert_returning_id(self, sql, params=()):
-        """For INSERTs that need the new row's id back. Azure SQL used
-        'OUTPUT INSERTED.id'; Oracle's equivalent is a RETURNING clause
-        bound to an output variable."""
+        """For INSERTs that need the new row's id back. Postgres/CockroachDB
+        support this natively with a RETURNING clause -- no special output
+        variable dance needed like Oracle."""
         cur = self._conn.cursor()
-        out_id = cur.var(oracledb.NUMBER)
-        translated = _qmark_to_oracle(sql)
-        next_placeholder = len(params) + 1
-        cur.execute(f"{translated} RETURNING id INTO :{next_placeholder}", tuple(params) + (out_id,))
-        return int(out_id.getvalue()[0])
+        cur.execute(f"{_qmark_to_pg(sql)} RETURNING id", tuple(params))
+        return cur.fetchone()[0]
 
     def commit(self):
         self._conn.commit()
@@ -177,12 +149,18 @@ class Conn:
         if self._returned:
             return
         self._returned = True
+        if self._broken:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            return
         try:
             self._conn.rollback()
         except Exception:
             pass
         try:
-            _pool.release(self._conn)
+            _pool.putconn(self._conn)
         except Exception:
             try:
                 self._conn.close()
@@ -207,110 +185,105 @@ def db():
 def init():
     c = db()
     statements = [
-        """CREATE TABLE users(
-          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-          username VARCHAR2(255) UNIQUE NOT NULL,
-          fullname VARCHAR2(255),
-          school_class VARCHAR2(255),
-          school_name VARCHAR2(255),
-          country VARCHAR2(255),
-          region VARCHAR2(255),
-          district VARCHAR2(255),
-          role VARCHAR2(50) DEFAULT 'student',
-          birth_date VARCHAR2(50),
-          hide_birth_date NUMBER DEFAULT 0,
-          bio CLOB,
-          heart_status VARCHAR2(50) DEFAULT 'Available',
-          avatar_base64 CLOB,
-          can_post_news NUMBER DEFAULT 0,
-          password VARCHAR2(255) NOT NULL,
-          university VARCHAR2(255)
+        """CREATE TABLE IF NOT EXISTS users(
+          id SERIAL PRIMARY KEY,
+          username VARCHAR(255) UNIQUE NOT NULL,
+          fullname VARCHAR(255),
+          school_class VARCHAR(255),
+          school_name VARCHAR(255),
+          country VARCHAR(255),
+          region VARCHAR(255),
+          district VARCHAR(255),
+          role VARCHAR(50) DEFAULT 'student',
+          birth_date VARCHAR(50),
+          hide_birth_date INT DEFAULT 0,
+          bio TEXT,
+          heart_status VARCHAR(50) DEFAULT 'Available',
+          avatar_base64 TEXT,
+          can_post_news INT DEFAULT 0,
+          password VARCHAR(255) NOT NULL,
+          university VARCHAR(255)
         )""",
-        """CREATE TABLE posts(
-          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-          user_id NUMBER NOT NULL,
-          content CLOB,
-          media_base64 CLOB,
-          media_type VARCHAR2(50),
-          created_at VARCHAR2(50) DEFAULT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
+        """CREATE TABLE IF NOT EXISTS posts(
+          id SERIAL PRIMARY KEY,
+          user_id INT NOT NULL,
+          content TEXT,
+          media_base64 TEXT,
+          media_type VARCHAR(50),
+          created_at VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
         )""",
-        """CREATE TABLE comments(
-          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-          post_id NUMBER NOT NULL,
-          user_id NUMBER NOT NULL,
-          parent_id NUMBER,
-          content CLOB NOT NULL,
-          created_at VARCHAR2(50) DEFAULT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
+        """CREATE TABLE IF NOT EXISTS comments(
+          id SERIAL PRIMARY KEY,
+          post_id INT NOT NULL,
+          user_id INT NOT NULL,
+          parent_id INT,
+          content TEXT NOT NULL,
+          created_at VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
         )""",
-        """CREATE TABLE likes(
-          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-          user_id NUMBER NOT NULL,
-          post_id NUMBER NOT NULL,
-          is_like NUMBER NOT NULL,
-          created_at VARCHAR2(50) DEFAULT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
+        """CREATE TABLE IF NOT EXISTS likes(
+          id SERIAL PRIMARY KEY,
+          user_id INT NOT NULL,
+          post_id INT NOT NULL,
+          is_like INT NOT NULL,
+          created_at VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
         )""",
-        "CREATE UNIQUE INDEX iup ON likes(user_id, post_id)",
-        """CREATE TABLE follows(
-          follower_id NUMBER NOT NULL,
-          following_id NUMBER NOT NULL,
+        "CREATE UNIQUE INDEX IF NOT EXISTS iup ON likes(user_id, post_id)",
+        """CREATE TABLE IF NOT EXISTS follows(
+          follower_id INT NOT NULL,
+          following_id INT NOT NULL,
           PRIMARY KEY(follower_id, following_id)
         )""",
-        """CREATE TABLE school_news(
-          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-          title CLOB NOT NULL,
-          author VARCHAR2(255),
-          created_at VARCHAR2(50) DEFAULT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
+        """CREATE TABLE IF NOT EXISTS school_news(
+          id SERIAL PRIMARY KEY,
+          title TEXT NOT NULL,
+          author VARCHAR(255),
+          created_at VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
         )""",
-        """CREATE TABLE news_likes(
-          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-          user_id NUMBER NOT NULL,
-          news_id NUMBER NOT NULL,
-          created_at VARCHAR2(50) DEFAULT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
+        """CREATE TABLE IF NOT EXISTS news_likes(
+          id SERIAL PRIMARY KEY,
+          user_id INT NOT NULL,
+          news_id INT NOT NULL,
+          created_at VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
         )""",
-        "CREATE UNIQUE INDEX iun ON news_likes(user_id, news_id)",
-        """CREATE TABLE news_comments(
-          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-          news_id NUMBER NOT NULL,
-          user_id NUMBER NOT NULL,
-          content CLOB NOT NULL,
-          created_at VARCHAR2(50) DEFAULT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
+        "CREATE UNIQUE INDEX IF NOT EXISTS iun ON news_likes(user_id, news_id)",
+        """CREATE TABLE IF NOT EXISTS news_comments(
+          id SERIAL PRIMARY KEY,
+          news_id INT NOT NULL,
+          user_id INT NOT NULL,
+          content TEXT NOT NULL,
+          created_at VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
         )""",
-        """CREATE TABLE comment_likes(
-          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-          user_id NUMBER NOT NULL,
-          comment_id NUMBER NOT NULL,
-          created_at VARCHAR2(50) DEFAULT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
+        """CREATE TABLE IF NOT EXISTS comment_likes(
+          id SERIAL PRIMARY KEY,
+          user_id INT NOT NULL,
+          comment_id INT NOT NULL,
+          created_at VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
         )""",
-        "CREATE UNIQUE INDEX iucl ON comment_likes(user_id, comment_id)",
-        """CREATE TABLE news_comment_likes(
-          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-          user_id NUMBER NOT NULL,
-          comment_id NUMBER NOT NULL,
-          created_at VARCHAR2(50) DEFAULT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
+        "CREATE UNIQUE INDEX IF NOT EXISTS iucl ON comment_likes(user_id, comment_id)",
+        """CREATE TABLE IF NOT EXISTS news_comment_likes(
+          id SERIAL PRIMARY KEY,
+          user_id INT NOT NULL,
+          comment_id INT NOT NULL,
+          created_at VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
         )""",
-        "CREATE UNIQUE INDEX iuncl ON news_comment_likes(user_id, comment_id)",
-        """CREATE TABLE certificates(
-          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-          user_id NUMBER NOT NULL,
-          title CLOB NOT NULL,
-          image_base64 CLOB,
-          verified NUMBER DEFAULT 1,
-          created_at VARCHAR2(50) DEFAULT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
+        "CREATE UNIQUE INDEX IF NOT EXISTS iuncl ON news_comment_likes(user_id, comment_id)",
+        """CREATE TABLE IF NOT EXISTS certificates(
+          id SERIAL PRIMARY KEY,
+          user_id INT NOT NULL,
+          title TEXT NOT NULL,
+          image_base64 TEXT,
+          verified INT DEFAULT 1,
+          created_at VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
         )""",
     ]
-    # Each statement runs on its own, so re-running this on every deploy is
-    # safe: Oracle has no CREATE TABLE IF NOT EXISTS on every version, so a
-    # second run simply hits ORA-00955 ("name is already used by an
-    # existing object") for tables/indexes that already exist -- that
-    # specific error is expected and swallowed; anything else is printed
-    # to the Render logs instead of silently aborting the whole batch.
+    # CREATE TABLE/INDEX IF NOT EXISTS makes every one of these safe to
+    # re-run on every deploy -- no special-case error codes to swallow like
+    # the Oracle/Azure versions needed.
     for stmt in statements:
         try:
             c.execute(stmt)
             c.commit()
-        except oracledb.Error as e:
-            if "ORA-00955" in str(e) or "ORA-01408" in str(e):
-                continue
+        except Exception as e:
             print(f"[init] schema statement failed (continuing): {e}")
             try:
                 c._conn.rollback()
@@ -324,7 +297,7 @@ init()
 
 # ---------------------------------------------------------------------------
 # Cloudflare R2 (S3-compatible) object storage -- used for ALL images (post
-# media, avatars, certificate photos). Text/post data stays in Oracle;
+# media, avatars, certificate photos). Text/post data stays in CockroachDB;
 # only the raw image bytes live in R2, so the database never has to store
 # or transfer big base64 blobs. The users/posts/certificates columns that
 # used to hold raw base64 image data (avatar_base64, media_base64,
@@ -429,14 +402,13 @@ def ping():
 @app.get("/ping-db")
 def ping_db():
     """Hit this from an external cron service (e.g. cron-job.org) every
-    hour or so. Oracle Autonomous DB Always Free instances stop themselves
-    after about 7 days with zero database activity -- a real app gets
-    traffic far more often than that, but this is a cheap extra safety net
-    (and a handy health check either way)."""
+    hour or so. CockroachDB Cloud's free tier doesn't force-pause the way
+    Azure's serverless SQL did, but this is still a cheap health check /
+    extra safety net."""
     try:
         c = db()
         try:
-            c.execute("SELECT 1 FROM DUAL").fetchall()
+            c.execute("SELECT 1").fetchall()
         finally:
             c.close()
         return "OK"
@@ -738,14 +710,13 @@ def search(q: str = "", viewer_id: Optional[int] = None):
     c = db()
     like = f"%{q}%"
     v = viewer_id if viewer_id is not None else -1
-    # Oracle's LIKE is case-sensitive by default (unlike SQL Server's
-    # default collation), so UPPER() is used on both sides to keep search
-    # behaving the same as before.
+    # ILIKE is Postgres/CockroachDB's built-in case-insensitive LIKE --
+    # keeps search behaving the same as SQL Server's default collation did.
     rows = c.execute("""SELECT id,username,fullname,avatar_base64,can_post_news,school_name,
         (SELECT 1 FROM follows WHERE follower_id=? AND following_id=users.id) is_following
-        FROM users WHERE UPPER(username) LIKE UPPER(?) OR UPPER(fullname) LIKE UPPER(?)
-        ORDER BY CASE WHEN UPPER(username) LIKE UPPER(?) THEN 0 ELSE 1 END, username ASC
-        FETCH FIRST 25 ROWS ONLY""",
+        FROM users WHERE username ILIKE ? OR fullname ILIKE ?
+        ORDER BY CASE WHEN username ILIKE ? THEN 0 ELSE 1 END, username ASC
+        LIMIT 25""",
         (v, like, like, q + "%")).fetchall()
     c.close()
     return [{**dict(r), "is_following": bool(r["is_following"])} for r in rows]
@@ -794,7 +765,7 @@ def news(user_id: Optional[int] = None):
         (SELECT COUNT(*) FROM news_comments m WHERE m.news_id=n.id) comments_count,
         (SELECT 1 FROM news_likes l WHERE l.news_id=n.id AND l.user_id=?) my_like
         FROM school_news n ORDER BY n.id DESC
-        FETCH FIRST 20 ROWS ONLY""", (v,)).fetchall()
+        LIMIT 20""", (v,)).fetchall()
     c.close(); return [dict(r) for r in rows]
 
 @app.post("/api/news/like")
@@ -853,17 +824,17 @@ def notifications(user_id: int):
     for r in c.execute("""SELECT l.created_at ts, u.username, u.fullname, p.content snippet FROM likes l
         JOIN posts p ON p.id=l.post_id JOIN users u ON u.id=l.user_id
         WHERE p.user_id=? AND l.user_id!=? AND l.is_like=1 ORDER BY l.id DESC
-        FETCH FIRST 10 ROWS ONLY""",
+        LIMIT 10""",
         (user_id, user_id)).fetchall():
         out.append({"type": "like", **dict(r)})
     for r in c.execute("""SELECT m.created_at ts, u.username, u.fullname, m.content snippet FROM comments m
         JOIN posts p ON p.id=m.post_id JOIN users u ON u.id=m.user_id
         WHERE p.user_id=? AND m.user_id!=? ORDER BY m.id DESC
-        FETCH FIRST 10 ROWS ONLY""",
+        LIMIT 10""",
         (user_id, user_id)).fetchall():
         out.append({"type": "comment", **dict(r)})
     for r in c.execute("""SELECT created_at ts, author username, author fullname, title snippet FROM school_news
-        ORDER BY id DESC FETCH FIRST 5 ROWS ONLY""").fetchall():
+        ORDER BY id DESC LIMIT 5""").fetchall():
         out.append({"type": "news", **dict(r)})
     c.close()
     out.sort(key=lambda x: x["ts"] or "", reverse=True)
