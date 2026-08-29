@@ -3,4 +3,5 @@ uvicorn[standard]
 python-multipart
 pydantic
 boto3
-oracledb
+psycopg2-binary
+
