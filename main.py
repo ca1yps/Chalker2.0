@@ -11,14 +11,11 @@ from botocore.client import Config as _BotoConfig
 import psycopg2
 from psycopg2 import pool
 
-from fastapi import FastAPI, Form, File, UploadFile, Request
+from fastapi import FastAPI, Form, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
-# CockroachDB / PostgreSQL ulanish manzili
-# MUHIM: parol va manzil endi FAQAT environment variable orqali beriladi.
-# Kodga hech qachon haqiqiy DB parolini yozib qo'ymang (git/GitHub'ga tushib qolishi mumkin).
 DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("COCKROACH_URL")
 if not DATABASE_URL:
     raise RuntimeError(
@@ -35,15 +32,6 @@ INDEX = next((p for p in _INDEX_CANDIDATES if os.path.exists(p)), _INDEX_CANDIDA
 
 app = FastAPI(title="Chalker")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
-
-@app.exception_handler(Exception)
-async def _global_error_handler(request: Request, exc: Exception):
-    # Har qanday kutilmagan xato (masalan: DB ulanishi vaqtincha uzilishi,
-    # CockroachDB klasteri "uyquda" bo'lishi, connection pool band bo'lib qolishi)
-    # endi umumiy "Server error (500)" o'rniga ANIQ matn bilan qaytadi,
-    # va butun ilova qulab tushmaydi.
-    print(f"[UNHANDLED ERROR] {request.method} {request.url.path} -> {type(exc).__name__}: {exc}")
-    return JSONResponse({"error": f"Kutilmagan server xatosi: {exc}"}, status_code=500)
 
 _POOL_MIN = 1
 _POOL_MAX = 10
@@ -63,8 +51,6 @@ def get_pool():
     return _pg_pool
 
 def _format_sql(sql: str) -> str:
-    """SQL so'rovidagi '?' belgilari o'rniga CockroachDB/Postgres bind parametrlarini (%s),
-    'SELECT TOP N' o'rniga 'LIMIT N', va RETURNING... shakllarini moslashtiradi."""
     # TOP N ni LIMIT N ga o'girish
     top_match = re.search(r'\bSELECT\s+TOP\s+(\d+)\s+', sql, flags=re.IGNORECASE)
     limit_clause = ""
@@ -73,13 +59,8 @@ def _format_sql(sql: str) -> str:
         sql = re.sub(r'\bSELECT\s+TOP\s+\d+\s+', 'SELECT ', sql, flags=re.IGNORECASE)
         limit_clause = f" LIMIT {limit_count}"
 
-    # RETURNING ... INTO ? shaklini CockroachDB RETURNING id ga o'girish
     sql = re.sub(r'\bRETURNING\s+(\w+)\s+INTO\s+\?', r'RETURNING \1', sql, flags=re.IGNORECASE)
-
-    # SQL da [timestamp] qavslarini olib tashlash
     sql = sql.replace("[timestamp]", "timestamp")
-
-    # '?' belgilari o'rniga %s o'rnatish
     formatted_sql = sql.replace("?", "%s")
 
     if limit_clause:
@@ -117,7 +98,7 @@ class Conn:
             formatted_sql = _format_sql(sql)
             cur.execute(formatted_sql, tuple(params))
             return _CursorWrap(cur)
-        except Exception:
+        except Exception as e:
             try:
                 get_pool().putconn(self._conn, close=True)
                 self._conn = get_pool().getconn()
@@ -125,12 +106,11 @@ class Conn:
                 formatted_sql = _format_sql(sql)
                 cur.execute(formatted_sql, tuple(params))
                 return _CursorWrap(cur)
-            except Exception as e:
+            except Exception as ex:
                 self._broken = True
-                raise e
+                raise ex
 
     def execute_insert_id(self, sql, params=()):
-        """Yangi qator qo'shilganda generatsiya qilingan ID ni qaytaruvchi yordamchi usul."""
         try:
             cur = self._conn.cursor()
             formatted_sql = _format_sql(sql)
@@ -250,7 +230,7 @@ def init():
         """CREATE TABLE IF NOT EXISTS comment_likes (
             id INT8 PRIMARY KEY DEFAULT unique_rowid(),
             user_id INT8 NOT NULL,
-            comment_id INT8 NOT NULL,
+            comment_id INT8 NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
             timestamp VARCHAR(50) DEFAULT to_char(now() + interval '5 hour', 'YYYY-MM-DD HH24:MI:SS')
         );""",
 
@@ -259,7 +239,7 @@ def init():
         """CREATE TABLE IF NOT EXISTS news_comment_likes (
             id INT8 PRIMARY KEY DEFAULT unique_rowid(),
             user_id INT8 NOT NULL,
-            comment_id INT8 NOT NULL,
+            comment_id INT8 NOT NULL REFERENCES news_comments(id) ON DELETE CASCADE,
             timestamp VARCHAR(50) DEFAULT to_char(now() + interval '5 hour', 'YYYY-MM-DD HH24:MI:SS')
         );""",
 
@@ -282,7 +262,7 @@ def init():
             c.execute(stmt)
             c.commit()
         except Exception as e:
-            print(f"[init] schema statement failed (continuing): {e}")
+            print(f"[init] schema statement failed: {e}")
 
     c.close()
 
@@ -307,7 +287,7 @@ if R2_ACCESS_KEY and R2_SECRET_KEY and R2_ENDPOINT:
 
 IMAGE_ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 IMAGE_MAX_SIZE = 8 * 1024 * 1024
-IMAGE_LIMIT_MSG = "Rasm hajmi 8MB dan oshmasligi va faqat (jpg, png, gif, webp) formatda bo'lishi kerak!"
+IMAGE_LIMIT_MSG = "Rasm hajmi 8MB dan oshmasligi kerak!"
 
 def pub(r):
     d = dict(r); d.pop("password", None); return d
@@ -321,7 +301,7 @@ def clean_u(u):
     return u.strip().lower().lstrip("@")
 
 _USERNAME_RE = re.compile(r"^[a-z0-9_.]{5,}$")
-_USERNAME_ERR = "Username kamida 5 belgidan iborat bo'lishi va faqat harf, raqam, \"_\" va \".\" belgilaridan tashkil topishi kerak!"
+_USERNAME_ERR = "Username kamida 5 belgidan iborat bo'lishi kerak!"
 def valid_username(u):
     return bool(_USERNAME_RE.match(u or ""))
 
@@ -404,7 +384,7 @@ def register(username: str = Form(...), fullname: str = Form(...), password: str
         c.close(); return err("Parol kamida 4 belgi!")
 
     new_id = c.execute_insert_id(
-        "INSERT INTO users(username,fullname,password) VALUES(?,?,?) RETURNING id INTO ?",
+        "INSERT INTO users(username,fullname,password) VALUES(?,?,?) RETURNING id",
         (u, fullname.strip(), password)
     )
     c.commit(); r = urow(c, new_id); c.close()
@@ -541,7 +521,7 @@ def certificate_self_delete(b: CertSelfDel):
 async def upload_image(file: UploadFile = File(...)):
     try:
         if _r2 is None:
-            return err("Fayl xizmati sozlanmagan: R2 kalitlari (.env) topilmadi!", 500)
+            return err("R2 kalitlari topilmadi!", 500)
         orig_name = file.filename or "rasm.jpg"
         ext = os.path.splitext(orig_name)[1].lower()
         if ext not in IMAGE_ALLOWED_EXT:
@@ -558,7 +538,7 @@ async def upload_image(file: UploadFile = File(...)):
         )
         return {"url": f"{R2_PUBLIC_URL}/{key}"}
     except Exception as e:
-        return err(f"Kutilmagan xatolik: {e}", 500)
+        return err(f"Xatolik: {e}", 500)
 
 @app.post("/api/posts/create")
 def post_create(b: PostCreate):
@@ -640,25 +620,22 @@ def comments(post_id: int, viewer_id: Optional[int] = None):
 def comment_like(b: CommentLikeReq):
     c = db()
     try:
-        deleted = c.execute(
-            "DELETE FROM comment_likes WHERE user_id=? AND comment_id=? RETURNING id",
-            (b.user_id, b.comment_id)
-        ).fetchone()
-        if deleted:
+        comm = c.execute("SELECT id FROM comments WHERE id=?", (b.comment_id,)).fetchone()
+        if not comm:
+            return err("Komment topilmadi!", 404)
+
+        if c.execute("SELECT 1 FROM comment_likes WHERE user_id=? AND comment_id=?", (b.user_id, b.comment_id)).fetchone():
+            c.execute("DELETE FROM comment_likes WHERE user_id=? AND comment_id=?", (b.user_id, b.comment_id))
             liked = False
         else:
-            c.execute(
-                "INSERT INTO comment_likes(user_id,comment_id) VALUES(?,?) ON CONFLICT (user_id,comment_id) DO NOTHING",
-                (b.user_id, b.comment_id)
-            )
+            c.execute("INSERT INTO comment_likes(user_id,comment_id) VALUES(?,?)", (b.user_id, b.comment_id))
             liked = True
-        cnt = c.execute("SELECT COUNT(*) cnt FROM comment_likes WHERE comment_id=?", (b.comment_id,)).fetchone()["cnt"]
+
+        cnt = c.execute("SELECT COUNT(*) AS cnt FROM comment_likes WHERE comment_id=?", (b.comment_id,)).fetchone()["cnt"]
         c.commit()
         return {"liked": liked, "count": cnt}
-    except psycopg2.errors.ForeignKeyViolation:
-        return err("Bu komment allaqachon o'chirilgan. Sahifani yangilang.", 409)
     except Exception as e:
-        return err(f"Layk bosishda xatolik: {e}", 500)
+        return err(f"Xatolik: {e}", 500)
     finally:
         c.close()
 
@@ -670,13 +647,7 @@ def comment_delete(b: CommentDel):
     requester = urow(c, b.user_id)
     if r["user_id"] != b.user_id and not (requester and requester["username"] == "boss"):
         c.close(); return err("Ruxsat yo'q!", 403)
-    # Kommentga (va uning javoblariga) tegishli laykларни ham tozalab tashlaymiz,
-    # aks holda "yetim" comment_likes qatorlari qolib, keyinchalik FK xatosiga olib keladi.
-    child_ids = [x["id"] for x in c.execute(
-        "SELECT id FROM comments WHERE id=? OR parent_id=?", (b.comment_id, b.comment_id)
-    ).fetchall()]
-    for cid in child_ids:
-        c.execute("DELETE FROM comment_likes WHERE comment_id=?", (cid,))
+    c.execute("DELETE FROM comment_likes WHERE comment_id=?", (b.comment_id,))
     c.execute("DELETE FROM comments WHERE id=? OR parent_id=?", (b.comment_id, b.comment_id))
     c.commit(); c.close(); return {"success": True}
 
@@ -688,10 +659,10 @@ def search(q: str = "", viewer_id: Optional[int] = None):
     c = db()
     like = f"%{q}%"
     v = viewer_id if viewer_id is not None else -1
-    rows = c.execute("""SELECT TOP 25 id,username,fullname,avatar_base64,can_post_news,school_name,
+    rows = c.execute("""SELECT id,username,fullname,avatar_base64,can_post_news,school_name,
         (SELECT 1 FROM follows WHERE follower_id=? AND following_id=users.id) is_following
         FROM users WHERE username LIKE ? OR fullname LIKE ?
-        ORDER BY CASE WHEN username LIKE ? THEN 0 ELSE 1 END, username ASC""",
+        ORDER BY CASE WHEN username LIKE ? THEN 0 ELSE 1 END, username ASC LIMIT 25""",
         (v, like, like, q + "%")).fetchall()
     c.close()
     return [{**dict(r), "is_following": bool(r["is_following"])} for r in rows]
@@ -735,11 +706,11 @@ def news_delete(b: NewsDel):
 def news(user_id: Optional[int] = None):
     v = user_id if user_id is not None else -1
     c = db()
-    rows = c.execute("""SELECT TOP 20 n.*,
+    rows = c.execute("""SELECT n.*,
         (SELECT COUNT(*) FROM news_likes l WHERE l.news_id=n.id) likes_count,
         (SELECT COUNT(*) FROM news_comments m WHERE m.news_id=n.id) comments_count,
         (SELECT 1 FROM news_likes l WHERE l.news_id=n.id AND l.user_id=?) my_like
-        FROM school_news n ORDER BY n.id DESC""", (v,)).fetchall()
+        FROM school_news n ORDER BY n.id DESC LIMIT 20""", (v,)).fetchall()
     c.close(); return [dict(r) for r in rows]
 
 @app.post("/api/news/like")
@@ -774,25 +745,22 @@ def news_comments(news_id: int, viewer_id: Optional[int] = None):
 def news_comment_like(b: NewsCommentLikeReq):
     c = db()
     try:
-        deleted = c.execute(
-            "DELETE FROM news_comment_likes WHERE user_id=? AND comment_id=? RETURNING id",
-            (b.user_id, b.comment_id)
-        ).fetchone()
-        if deleted:
+        comm = c.execute("SELECT id FROM news_comments WHERE id=?", (b.comment_id,)).fetchone()
+        if not comm:
+            return err("Komment topilmadi!", 404)
+
+        if c.execute("SELECT 1 FROM news_comment_likes WHERE user_id=? AND comment_id=?", (b.user_id, b.comment_id)).fetchone():
+            c.execute("DELETE FROM news_comment_likes WHERE user_id=? AND comment_id=?", (b.user_id, b.comment_id))
             liked = False
         else:
-            c.execute(
-                "INSERT INTO news_comment_likes(user_id,comment_id) VALUES(?,?) ON CONFLICT (user_id,comment_id) DO NOTHING",
-                (b.user_id, b.comment_id)
-            )
+            c.execute("INSERT INTO news_comment_likes(user_id,comment_id) VALUES(?,?)", (b.user_id, b.comment_id))
             liked = True
-        cnt = c.execute("SELECT COUNT(*) cnt FROM news_comment_likes WHERE comment_id=?", (b.comment_id,)).fetchone()["cnt"]
+
+        cnt = c.execute("SELECT COUNT(*) AS cnt FROM news_comment_likes WHERE comment_id=?", (b.comment_id,)).fetchone()["cnt"]
         c.commit()
         return {"liked": liked, "count": cnt}
-    except psycopg2.errors.ForeignKeyViolation:
-        return err("Bu komment allaqachon o'chirilgan. Sahifani yangilang.", 409)
     except Exception as e:
-        return err(f"Layk bosishda xatolik: {e}", 500)
+        return err(f"Xatolik: {e}", 500)
     finally:
         c.close()
 
@@ -812,17 +780,17 @@ def news_comment_delete(b: NewsCommentDel):
 def notifications(user_id: int):
     c = db()
     out = []
-    for r in c.execute("""SELECT TOP 10 l.timestamp ts, u.username, u.fullname, p.content snippet FROM likes l
+    for r in c.execute("""SELECT l.timestamp ts, u.username, u.fullname, p.content snippet FROM likes l
         JOIN posts p ON p.id=l.post_id JOIN users u ON u.id=l.user_id
-        WHERE p.user_id=? AND l.user_id!=? AND l.is_like=1 ORDER BY l.id DESC""",
+        WHERE p.user_id=? AND l.user_id!=? AND l.is_like=1 ORDER BY l.id DESC LIMIT 10""",
         (user_id, user_id)).fetchall():
         out.append({"type": "like", **dict(r)})
-    for r in c.execute("""SELECT TOP 10 m.timestamp ts, u.username, u.fullname, m.content snippet FROM comments m
+    for r in c.execute("""SELECT m.timestamp ts, u.username, u.fullname, m.content snippet FROM comments m
         JOIN posts p ON p.id=m.post_id JOIN users u ON u.id=m.user_id
-        WHERE p.user_id=? AND m.user_id!=? ORDER BY m.id DESC""",
+        WHERE p.user_id=? AND m.user_id!=? ORDER BY m.id DESC LIMIT 10""",
         (user_id, user_id)).fetchall():
         out.append({"type": "comment", **dict(r)})
-    for r in c.execute("SELECT TOP 5 timestamp ts, author username, author fullname, title snippet FROM school_news ORDER BY id DESC").fetchall():
+    for r in c.execute("SELECT timestamp ts, author username, author fullname, title snippet FROM school_news ORDER BY id DESC LIMIT 5").fetchall():
         out.append({"type": "news", **dict(r)})
     c.close()
     out.sort(key=lambda x: x["ts"] or "", reverse=True)
