@@ -8,7 +8,7 @@ from typing import Optional
 
 import boto3
 from botocore.client import Config as _BotoConfig
-import pyodbc
+import oracledb
 
 from fastapi import FastAPI, Form, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,24 +16,26 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 # ---------------------------------------------------------------------------
-# Database connection (Azure SQL Database, via pyodbc)
+# Database connection (Oracle Autonomous Database, via python-oracledb)
 # ---------------------------------------------------------------------------
-# Set AZURE_SQL_CONNECTIONSTRING in your host's Environment settings (Render
-# -> Environment) -- never commit the real password into the repo / git
-# history. Example value:
-#   DRIVER={ODBC Driver 18 for SQL Server};SERVER=tcp:chalker-server.database.windows.net,1433;
-#   DATABASE=free-sql-db-5447952;UID=chalkeradmin;PWD=<parolingiz>;
-#   Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;
-AZURE_CONN_STR = os.getenv(
-    "AZURE_SQL_CONNECTIONSTRING",
-    "DRIVER={ODBC Driver 18 for SQL Server};"
-    "SERVER=tcp:chalker-server.database.windows.net,1433;"
-    "DATABASE=free-sql-db-5447952;"
-    "Uid=chalkeradmin;"
-    "Pwd=ilyo$6eey06072009;"  # <-- Shu yerga Azure SQL parolingizni yozing!
-    "Encrypt=yes;"
-    "TrustServerCertificate=no;"
-    "Connection Timeout=30;"
+# Set these in your host's Environment settings (Render -> Environment),
+# never commit real credentials into the repo / git history.
+#   ORACLE_DB_USER      e.g. ADMIN
+#   ORACLE_DB_PASSWORD  your Autonomous DB password
+#   ORACLE_DB_DSN       the connect descriptor from Oracle Cloud (Database
+#                        Connection -> "Connection String", *_high service)
+#
+# This uses TLS + server-DN-match (no wallet file needed) exactly like the
+# quickstart script Oracle Cloud gave you -- python-oracledb's default
+# "thin" mode speaks this natively, no Oracle Instant Client install
+# required on Render.
+ORACLE_USER = os.getenv("ORACLE_DB_USER", "USER_NAME")
+ORACLE_PASSWORD = os.getenv("ORACLE_DB_PASSWORD", "PASSWORD")
+ORACLE_DSN = os.getenv(
+    "ORACLE_DB_DSN",
+    "(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)"
+    "(host=adb.eu-frankfurt-1.oraclecloud.com))(connect_data=(service_name="
+    "gae728d589dd162_chalkerdb_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))",
 )
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -47,83 +49,87 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 
 
 # ---------------------------------------------------------------------------
-# Connection pool
+# Oracle connection pool
 # ---------------------------------------------------------------------------
-# pyodbc has no built-in pool like psycopg2.pool.ThreadedConnectionPool, so
-# this is a small hand-rolled one: up to POOL_SIZE live connections are kept
-# around and reused across requests instead of opening (and leaking, if an
-# endpoint errors before closing it) a brand new physical connection to
-# Azure SQL on every single API call.
+# Unlike pyodbc, python-oracledb ships its own thread-safe pool
+# (oracledb.create_pool), so there's no need to hand-roll one with a
+# queue.Queue like the Azure SQL version did. The pool also has a built-in
+# "ping_interval" (default 60s): a connection that's been idle longer than
+# that is silently validated/reconnected before being handed to a request,
+# which is what fixes the "stale connection -> Communication link failure"
+# class of bug we kept hitting on Azure.
 # ---------------------------------------------------------------------------
 _POOL_SIZE = 5
-_pool = queue.Queue(maxsize=_POOL_SIZE)
-_pool_lock = threading.Lock()
-_pool_created = 0
 
 
-def _new_conn():
-    return pyodbc.connect(AZURE_CONN_STR, autocommit=False)
+def _clob_output_type_handler(cursor, metadata):
+    # Auto-convert CLOB/NCLOB columns to plain Python strings on fetch
+    # instead of LOB locator objects, which (a) need an explicit .read()
+    # call and (b) can't be JSON-serialized directly by FastAPI.
+    if metadata.type_code in (oracledb.DB_TYPE_CLOB, oracledb.DB_TYPE_NCLOB):
+        return cursor.var(oracledb.DB_TYPE_LONG, arraysize=cursor.arraysize)
+    if metadata.type_code is oracledb.DB_TYPE_BLOB:
+        return cursor.var(oracledb.DB_TYPE_LONG_RAW, arraysize=cursor.arraysize)
+    return None
 
 
-def _new_conn_with_retry(retries=10, delay=8):
-    """Used only at startup. A free/serverless Azure SQL database auto-pauses
-    after a period of inactivity and can take well over 30 seconds to resume,
-    which makes the very first login attempt fail with either
-    '08S01/HYT00 Login timeout expired' or the more specific
-    '(40613) Database ... is not currently available. Please retry the
-    connection later' -- Microsoft's own documented signal that the database
-    is mid-resume. Retry with a delay instead of crashing the whole app on
-    deploy. This does NOT help if the real cause is a firewall blocking
-    Render's IP (every attempt will fail the same way and this still raises
-    once retries are exhausted)."""
+def _new_pool_with_retry(retries=10, delay=8):
+    """Oracle Autonomous DB (Always Free) doesn't auto-pause the way
+    Azure's serverless tier does, but the very first connection right
+    after a fresh deploy can still occasionally hit a transient
+    network/TLS hiccup. Retry a few times instead of crashing the whole
+    app on deploy."""
     last_err = None
     for attempt in range(1, retries + 1):
         try:
-            return pyodbc.connect(AZURE_CONN_STR, autocommit=False)
-        except pyodbc.Error as e:
+            return oracledb.create_pool(
+                user=ORACLE_USER,
+                password=ORACLE_PASSWORD,
+                dsn=ORACLE_DSN,
+                min=1,
+                max=_POOL_SIZE,
+                increment=1,
+                ping_interval=60,
+            )
+        except oracledb.Error as e:
             last_err = e
             if attempt < retries:
                 time.sleep(delay)
     raise last_err
 
 
-def _get_conn():
-    global _pool_created
-    try:
-        return _pool.get_nowait()
-    except queue.Empty:
-        pass
-    with _pool_lock:
-        if _pool_created < _POOL_SIZE:
-            _pool_created += 1
-            return _new_conn()
-    # Pool is fully allocated and every connection is currently in use --
-    # wait for one to be returned rather than opening an unbounded number
-    # of physical connections to Azure SQL.
-    return _pool.get()
+_pool = _new_pool_with_retry()
+
+_QMARK_RE = re.compile(r"\?")
 
 
-def _put_conn(conn):
-    try:
-        _pool.put_nowait(conn)
-    except queue.Full:
-        try:
-            conn.close()
-        except Exception:
-            pass
+def _qmark_to_oracle(sql):
+    """python-oracledb has no '?' placeholder support like pyodbc/sqlite3
+    -- it uses numbered binds (':1', ':2', ...). Translating here means
+    every query string elsewhere in this file could stay exactly as
+    written, with the same '?' placeholders as before."""
+    counter = [0]
+
+    def _repl(_m):
+        counter[0] += 1
+        return f":{counter[0]}"
+
+    return _QMARK_RE.sub(_repl, sql)
 
 
 class _CursorWrap:
-    """Wraps a pyodbc cursor so fetchone()/fetchall() return plain dicts
-    keyed by column name -- pyodbc.Row objects only support index/attribute
-    access, but the rest of this file was written expecting RealDictCursor
-    -style dict rows (r["colname"], dict(r), etc)."""
+    """Wraps an oracledb cursor so fetchone()/fetchall() return plain
+    dicts keyed by lowercase column name. Oracle uppercases unquoted
+    identifiers internally (USERNAME, CAN_POST_NEWS, ...), but the rest of
+    this file was written expecting lowercase keys (r["username"],
+    dict(r), etc) -- lowercasing here means none of that code needed to
+    change."""
 
     def __init__(self, cur):
         self._cur = cur
 
     def _cols(self):
-        return [d[0] for d in self._cur.description] if self._cur.description else []
+        return [d[0].lower() for d in self._cur.description] if self._cur.description else []
 
     def fetchone(self):
         row = self._cur.fetchone()
@@ -139,70 +145,55 @@ class _CursorWrap:
 class Conn:
     """Thin wrapper so the rest of the file can keep using the same
     sqlite3-style pattern: c.execute(sql, params).fetchone()/.fetchall(),
-    c.commit(), c.close() -- but talking to Azure SQL underneath via
-    pyodbc, using a small pool of reused connections. pyodbc natively
-    accepts '?' placeholders, so none of the query strings below needed
-    to be rewritten for that."""
+    c.commit(), c.close() -- but talking to Oracle underneath via
+    python-oracledb, borrowing a connection from the pool for the
+    lifetime of one request."""
 
     def __init__(self):
-        self._conn = _get_conn()
+        self._conn = _pool.acquire()
+        self._conn.outputtypehandler = _clob_output_type_handler
         self._returned = False
-        self._broken = False
 
     def execute(self, sql, params=()):
-        try:
-            cur = self._conn.cursor()
-            cur.execute(sql, tuple(params))
-            return _CursorWrap(cur)
-        except pyodbc.Error:
-            # The pooled connection is stale -- Azure SQL (or a firewall in
-            # between) closed it after sitting idle, so the next query on it
-            # fails with things like '08S01 Communication link failure'.
-            # Drop it and retry once on a brand new connection instead of
-            # bubbling up a 500 for something a reconnect fixes.
-            try:
-                self._conn.close()
-            except Exception:
-                pass
-            try:
-                self._conn = _new_conn()
-                cur = self._conn.cursor()
-                cur.execute(sql, tuple(params))
-                return _CursorWrap(cur)
-            except Exception:
-                # Retry also failed -- this is a real error (bad SQL, DB
-                # down, etc), not just a stale connection. Mark the
-                # connection broken so it isn't handed back to the pool.
-                self._broken = True
-                raise
+        cur = self._conn.cursor()
+        cur.execute(_qmark_to_oracle(sql), tuple(params))
+        return _CursorWrap(cur)
+
+    def execute_insert_returning_id(self, sql, params=()):
+        """For INSERTs that need the new row's id back. Azure SQL used
+        'OUTPUT INSERTED.id'; Oracle's equivalent is a RETURNING clause
+        bound to an output variable."""
+        cur = self._conn.cursor()
+        out_id = cur.var(oracledb.NUMBER)
+        translated = _qmark_to_oracle(sql)
+        next_placeholder = len(params) + 1
+        cur.execute(f"{translated} RETURNING id INTO :{next_placeholder}", tuple(params) + (out_id,))
+        return int(out_id.getvalue()[0])
 
     def commit(self):
         self._conn.commit()
 
     def close(self):
-        # Return the connection to the pool instead of physically closing
-        # it, so it can be reused by the next request.
         if self._returned:
             return
         self._returned = True
-        if self._broken:
-            try:
-                self._conn.close()
-            except Exception:
-                pass
-            return
         try:
             self._conn.rollback()
         except Exception:
             pass
-        _put_conn(self._conn)
+        try:
+            _pool.release(self._conn)
+        except Exception:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
 
     def __del__(self):
-        # Safety net: if an endpoint throws before calling c.close() (a bug,
-        # an unexpected error, etc.) the connection still gets returned to
-        # the pool here once the Conn object is garbage-collected, instead
-        # of being leaked forever and slowly exhausting Azure SQL's
-        # connection quota.
+        # Safety net: if an endpoint throws before calling c.close() (a
+        # bug, an unexpected error, etc.) the connection still gets
+        # returned to the pool here once the Conn object is
+        # garbage-collected, instead of being leaked forever.
         try:
             self.close()
         except Exception:
@@ -214,202 +205,117 @@ def db():
 
 
 def init():
-    # Warm up the pool with one connection that retries on failure, so a
-    # slow-to-resume Azure SQL database gets a chance to wake up instead of
-    # crashing the whole app the moment `uvicorn` imports this module.
-    global _pool_created
-    if _pool_created == 0:
-        with _pool_lock:
-            if _pool_created == 0:
-                _pool.put_nowait(_new_conn_with_retry())
-                _pool_created = 1
     c = db()
     statements = [
-        """IF OBJECT_ID('dbo.users','U') IS NULL
-        CREATE TABLE users(
-          id INT IDENTITY(1,1) PRIMARY KEY,
-          username NVARCHAR(255) UNIQUE NOT NULL,
-          fullname NVARCHAR(255),
-          school_class NVARCHAR(255),
-          school_name NVARCHAR(255),
-          country NVARCHAR(255),
-          region NVARCHAR(255),
-          district NVARCHAR(255),
-          role NVARCHAR(50) DEFAULT 'student',
-          birth_date NVARCHAR(50),
-          hide_birth_date INT DEFAULT 0,
-          bio NVARCHAR(MAX),
-          heart_status NVARCHAR(50) DEFAULT 'Available',
-          avatar_base64 NVARCHAR(MAX),
-          can_post_news INT DEFAULT 0,
-          password NVARCHAR(255) NOT NULL
+        """CREATE TABLE users(
+          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+          username VARCHAR2(255) UNIQUE NOT NULL,
+          fullname VARCHAR2(255),
+          school_class VARCHAR2(255),
+          school_name VARCHAR2(255),
+          country VARCHAR2(255),
+          region VARCHAR2(255),
+          district VARCHAR2(255),
+          role VARCHAR2(50) DEFAULT 'student',
+          birth_date VARCHAR2(50),
+          hide_birth_date NUMBER DEFAULT 0,
+          bio CLOB,
+          heart_status VARCHAR2(50) DEFAULT 'Available',
+          avatar_base64 CLOB,
+          can_post_news NUMBER DEFAULT 0,
+          password VARCHAR2(255) NOT NULL,
+          university VARCHAR2(255)
         )""",
-        """IF OBJECT_ID('dbo.posts','U') IS NULL
-        CREATE TABLE posts(
-          id INT IDENTITY(1,1) PRIMARY KEY,
-          user_id INT NOT NULL,
-          content NVARCHAR(MAX),
-          media_base64 NVARCHAR(MAX),
-          media_type NVARCHAR(50),
-          [timestamp] NVARCHAR(50) DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120)
+        """CREATE TABLE posts(
+          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+          user_id NUMBER NOT NULL,
+          content CLOB,
+          media_base64 CLOB,
+          media_type VARCHAR2(50),
+          created_at VARCHAR2(50) DEFAULT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
         )""",
-        """IF OBJECT_ID('dbo.comments','U') IS NULL
-        CREATE TABLE comments(
-          id INT IDENTITY(1,1) PRIMARY KEY,
-          post_id INT NOT NULL,
-          user_id INT NOT NULL,
-          parent_id INT,
-          content NVARCHAR(MAX) NOT NULL,
-          [timestamp] NVARCHAR(50) DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120)
+        """CREATE TABLE comments(
+          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+          post_id NUMBER NOT NULL,
+          user_id NUMBER NOT NULL,
+          parent_id NUMBER,
+          content CLOB NOT NULL,
+          created_at VARCHAR2(50) DEFAULT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
         )""",
-        """IF OBJECT_ID('dbo.likes','U') IS NULL
-        CREATE TABLE likes(
-          id INT IDENTITY(1,1) PRIMARY KEY,
-          user_id INT NOT NULL,
-          post_id INT NOT NULL,
-          is_like INT NOT NULL,
-          [timestamp] NVARCHAR(50) DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120)
+        """CREATE TABLE likes(
+          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+          user_id NUMBER NOT NULL,
+          post_id NUMBER NOT NULL,
+          is_like NUMBER NOT NULL,
+          created_at VARCHAR2(50) DEFAULT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
         )""",
-        """IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='iup' AND object_id=OBJECT_ID('likes'))
-        CREATE UNIQUE INDEX iup ON likes(user_id, post_id)""",
-        """IF OBJECT_ID('dbo.follows','U') IS NULL
-        CREATE TABLE follows(
-          follower_id INT NOT NULL,
-          following_id INT NOT NULL,
+        "CREATE UNIQUE INDEX iup ON likes(user_id, post_id)",
+        """CREATE TABLE follows(
+          follower_id NUMBER NOT NULL,
+          following_id NUMBER NOT NULL,
           PRIMARY KEY(follower_id, following_id)
         )""",
-        """IF OBJECT_ID('dbo.school_news','U') IS NULL
-        CREATE TABLE school_news(
-          id INT IDENTITY(1,1) PRIMARY KEY,
-          title NVARCHAR(MAX) NOT NULL,
-          author NVARCHAR(255),
-          [timestamp] NVARCHAR(50) DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120)
+        """CREATE TABLE school_news(
+          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+          title CLOB NOT NULL,
+          author VARCHAR2(255),
+          created_at VARCHAR2(50) DEFAULT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
         )""",
-        """IF OBJECT_ID('dbo.news_likes','U') IS NULL
-        CREATE TABLE news_likes(
-          id INT IDENTITY(1,1) PRIMARY KEY,
-          user_id INT NOT NULL,
-          news_id INT NOT NULL,
-          [timestamp] NVARCHAR(50) DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120)
+        """CREATE TABLE news_likes(
+          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+          user_id NUMBER NOT NULL,
+          news_id NUMBER NOT NULL,
+          created_at VARCHAR2(50) DEFAULT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
         )""",
-        """IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='iun' AND object_id=OBJECT_ID('news_likes'))
-        CREATE UNIQUE INDEX iun ON news_likes(user_id, news_id)""",
-        """IF OBJECT_ID('dbo.news_comments','U') IS NULL
-        CREATE TABLE news_comments(
-          id INT IDENTITY(1,1) PRIMARY KEY,
-          news_id INT NOT NULL,
-          user_id INT NOT NULL,
-          content NVARCHAR(MAX) NOT NULL,
-          [timestamp] NVARCHAR(50) DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120)
+        "CREATE UNIQUE INDEX iun ON news_likes(user_id, news_id)",
+        """CREATE TABLE news_comments(
+          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+          news_id NUMBER NOT NULL,
+          user_id NUMBER NOT NULL,
+          content CLOB NOT NULL,
+          created_at VARCHAR2(50) DEFAULT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
         )""",
-        """IF OBJECT_ID('dbo.comment_likes','U') IS NULL
-        CREATE TABLE comment_likes(
-          id INT IDENTITY(1,1) PRIMARY KEY,
-          user_id INT NOT NULL,
-          comment_id INT NOT NULL,
-          [timestamp] NVARCHAR(50) DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120)
+        """CREATE TABLE comment_likes(
+          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+          user_id NUMBER NOT NULL,
+          comment_id NUMBER NOT NULL,
+          created_at VARCHAR2(50) DEFAULT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
         )""",
-        """IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='iucl' AND object_id=OBJECT_ID('comment_likes'))
-        CREATE UNIQUE INDEX iucl ON comment_likes(user_id, comment_id)""",
-        """IF OBJECT_ID('dbo.news_comment_likes','U') IS NULL
-        CREATE TABLE news_comment_likes(
-          id INT IDENTITY(1,1) PRIMARY KEY,
-          user_id INT NOT NULL,
-          comment_id INT NOT NULL,
-          [timestamp] NVARCHAR(50) DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120)
+        "CREATE UNIQUE INDEX iucl ON comment_likes(user_id, comment_id)",
+        """CREATE TABLE news_comment_likes(
+          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+          user_id NUMBER NOT NULL,
+          comment_id NUMBER NOT NULL,
+          created_at VARCHAR2(50) DEFAULT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
         )""",
-        """IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='iuncl' AND object_id=OBJECT_ID('news_comment_likes'))
-        CREATE UNIQUE INDEX iuncl ON news_comment_likes(user_id, comment_id)""",
-        """IF OBJECT_ID('dbo.certificates','U') IS NULL
-        CREATE TABLE certificates(
-          id INT IDENTITY(1,1) PRIMARY KEY,
-          user_id INT NOT NULL,
-          title NVARCHAR(MAX) NOT NULL,
-          image_base64 NVARCHAR(MAX),
-          verified INT DEFAULT 1,
-          [timestamp] NVARCHAR(50) DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120)
+        "CREATE UNIQUE INDEX iuncl ON news_comment_likes(user_id, comment_id)",
+        """CREATE TABLE certificates(
+          id NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+          user_id NUMBER NOT NULL,
+          title CLOB NOT NULL,
+          image_base64 CLOB,
+          verified NUMBER DEFAULT 1,
+          created_at VARCHAR2(50) DEFAULT TO_CHAR(SYSTIMESTAMP AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
         )""",
-        """IF COL_LENGTH('dbo.users','university') IS NULL
-        ALTER TABLE users ADD university NVARCHAR(255)""",
     ]
-    # Fix up the [timestamp] DEFAULT on tables that already existed before
-    # this fix (they were created with GETDATE(), which on Azure SQL
-    # Database returns UTC time -- 5 hours behind O'zbekiston/Tashkent
-    # time, which is exactly the "vaqt noto'g'ri" bug this patches). Brand
-    # new tables already get the corrected DEFAULT from the CREATE TABLE
-    # statements above; this loop repairs tables created before the fix.
-    # It's a no-op (guarded by the LIKE '%DATEADD%' check) once a table's
-    # default has already been corrected, so it's safe to run on every
-    # startup.
-    _TS_TABLES = ["posts", "comments", "likes", "school_news", "news_likes",
-                  "news_comments", "comment_likes", "news_comment_likes", "certificates"]
-    for tbl in _TS_TABLES:
-        statements.append(f"""
-        IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID('dbo.{tbl}') AND name='timestamp')
-           AND NOT EXISTS (
-             SELECT 1 FROM sys.default_constraints dc
-             JOIN sys.columns col ON col.object_id=dc.parent_object_id AND col.column_id=dc.parent_column_id
-             WHERE dc.parent_object_id=OBJECT_ID('dbo.{tbl}') AND col.name='timestamp' AND dc.definition LIKE '%DATEADD%'
-           )
-        BEGIN
-          DECLARE @cn NVARCHAR(200);
-          SELECT @cn = dc.name FROM sys.default_constraints dc
-          JOIN sys.columns col ON col.object_id=dc.parent_object_id AND col.column_id=dc.parent_column_id
-          WHERE dc.parent_object_id=OBJECT_ID('dbo.{tbl}') AND col.name='timestamp';
-          IF @cn IS NOT NULL EXEC('ALTER TABLE {tbl} DROP CONSTRAINT ' + @cn);
-          EXEC('ALTER TABLE {tbl} ADD DEFAULT CONVERT(VARCHAR(19), DATEADD(HOUR, 5, GETUTCDATE()), 120) FOR [timestamp]');
-        END""")
-    # Each statement runs on its own so one failure (e.g. a stale/partial
-    # previous deploy, or a table the migration already created slightly
-    # differently) can never block the rest of the schema from being
-    # created -- and any real error is printed to the Render logs instead
-    # of silently aborting the whole batch.
+    # Each statement runs on its own, so re-running this on every deploy is
+    # safe: Oracle has no CREATE TABLE IF NOT EXISTS on every version, so a
+    # second run simply hits ORA-00955 ("name is already used by an
+    # existing object") for tables/indexes that already exist -- that
+    # specific error is expected and swallowed; anything else is printed
+    # to the Render logs instead of silently aborting the whole batch.
     for stmt in statements:
         try:
             c.execute(stmt)
             c.commit()
-        except Exception as e:
+        except oracledb.Error as e:
+            if "ORA-00955" in str(e) or "ORA-01408" in str(e):
+                continue
             print(f"[init] schema statement failed (continuing): {e}")
             try:
                 c._conn.rollback()
             except Exception:
                 pass
-
-    # One-time data fix: shift already-stored [timestamp] values +5 hours
-    # to correct historic rows that were inserted while the DEFAULT still
-    # used GETDATE() (Azure SQL Database always runs in UTC, 5 hours behind
-    # O'zbekiston/Tashkent time). Guarded by a tiny migrations table so
-    # this can never be re-applied on a later restart and shift times
-    # twice.
-    try:
-        c.execute("""IF OBJECT_ID('dbo.schema_migrations','U') IS NULL
-            CREATE TABLE schema_migrations(name NVARCHAR(200) PRIMARY KEY, applied_at DATETIME DEFAULT GETUTCDATE())""")
-        c.commit()
-        already = c.execute(
-            "SELECT 1 FROM schema_migrations WHERE name=?", ("ts_tashkent_utc5_fix",)
-        ).fetchone()
-        if not already:
-            for tbl in _TS_TABLES:
-                try:
-                    c.execute(f"""UPDATE {tbl} SET [timestamp] = CONVERT(VARCHAR(19),
-                        DATEADD(HOUR, 5, CONVERT(DATETIME, [timestamp], 120)), 120)
-                        WHERE [timestamp] IS NOT NULL AND ISDATE([timestamp]) = 1""")
-                    c.commit()
-                except Exception as e:
-                    print(f"[init] one-time timestamp fix failed for {tbl} (continuing): {e}")
-                    try:
-                        c._conn.rollback()
-                    except Exception:
-                        pass
-            c.execute("INSERT INTO schema_migrations(name) VALUES(?)", ("ts_tashkent_utc5_fix",))
-            c.commit()
-    except Exception as e:
-        print(f"[init] migrations bookkeeping failed (continuing): {e}")
-        try:
-            c._conn.rollback()
-        except Exception:
-            pass
-
     c.commit(); c.close()
 
 
@@ -418,7 +324,7 @@ init()
 
 # ---------------------------------------------------------------------------
 # Cloudflare R2 (S3-compatible) object storage -- used for ALL images (post
-# media, avatars, certificate photos). Text/post data stays in Azure SQL;
+# media, avatars, certificate photos). Text/post data stays in Oracle;
 # only the raw image bytes live in R2, so the database never has to store
 # or transfer big base64 blobs. The users/posts/certificates columns that
 # used to hold raw base64 image data (avatar_base64, media_base64,
@@ -523,14 +429,14 @@ def ping():
 @app.get("/ping-db")
 def ping_db():
     """Hit this from an external cron service (e.g. cron-job.org) every
-    30-45 minutes. Azure's free/serverless SQL tier auto-pauses after around
-    an hour of no database activity -- '/ping' above never touches the
-    database, so it does nothing to prevent that. A real (tiny) query here
-    keeps the database from pausing during normal usage hours."""
+    hour or so. Oracle Autonomous DB Always Free instances stop themselves
+    after about 7 days with zero database activity -- a real app gets
+    traffic far more often than that, but this is a cheap extra safety net
+    (and a handy health check either way)."""
     try:
         c = db()
         try:
-            c.execute("SELECT 1").fetchall()
+            c.execute("SELECT 1 FROM DUAL").fetchall()
         finally:
             c.close()
         return "OK"
@@ -565,8 +471,8 @@ def register(username: str = Form(...), fullname: str = Form(...), password: str
         c.close(); return err(_USERNAME_ERR)
     if len(password) < 4:
         c.close(); return err("Parol kamida 4 belgi!")
-    cur = c.execute("INSERT INTO users(username,fullname,password) OUTPUT INSERTED.id VALUES(?,?,?)", (u, fullname.strip(), password))
-    new_id = cur.fetchone()["id"]
+    new_id = c.execute_insert_returning_id(
+        "INSERT INTO users(username,fullname,password) VALUES(?,?,?)", (u, fullname.strip(), password))
     c.commit(); r = urow(c, new_id); c.close()
     return {"user": pub(r)}
 
@@ -757,7 +663,7 @@ def post_delete(b: PostDel):
 def posts(user_id: Optional[int] = None, author: Optional[str] = None):
     v = user_id if user_id is not None else -1
     c = db()
-    sql = """SELECT p.id,p.user_id,p.content,p.media_base64,p.media_type,p.[timestamp],
+    sql = """SELECT p.id,p.user_id,p.content,p.media_base64,p.media_type,p.created_at,
         u.username,u.fullname,u.avatar_base64,u.can_post_news,
         (SELECT COUNT(*) FROM likes l WHERE l.post_id=p.id AND l.is_like=1) likes_count,
         (SELECT COUNT(*) FROM comments cm WHERE cm.post_id=p.id) comments_count,
@@ -795,7 +701,7 @@ def comment_create(b: CommentCreate):
 def comments(post_id: int, viewer_id: Optional[int] = None):
     v = viewer_id if viewer_id is not None else -1
     c = db()
-    rows = c.execute("""SELECT c.id,c.parent_id,c.content,c.[timestamp],u.username,u.fullname,
+    rows = c.execute("""SELECT c.id,c.parent_id,c.content,c.created_at,u.username,u.fullname,
         u.avatar_base64,u.can_post_news,
         (SELECT COUNT(*) FROM comment_likes cl WHERE cl.comment_id=c.id) likes_count,
         (SELECT 1 FROM comment_likes cl WHERE cl.comment_id=c.id AND cl.user_id=?) my_like
@@ -832,10 +738,14 @@ def search(q: str = "", viewer_id: Optional[int] = None):
     c = db()
     like = f"%{q}%"
     v = viewer_id if viewer_id is not None else -1
-    rows = c.execute("""SELECT TOP 25 id,username,fullname,avatar_base64,can_post_news,school_name,
+    # Oracle's LIKE is case-sensitive by default (unlike SQL Server's
+    # default collation), so UPPER() is used on both sides to keep search
+    # behaving the same as before.
+    rows = c.execute("""SELECT id,username,fullname,avatar_base64,can_post_news,school_name,
         (SELECT 1 FROM follows WHERE follower_id=? AND following_id=users.id) is_following
-        FROM users WHERE username LIKE ? OR fullname LIKE ?
-        ORDER BY CASE WHEN username LIKE ? THEN 0 ELSE 1 END, username ASC""",
+        FROM users WHERE UPPER(username) LIKE UPPER(?) OR UPPER(fullname) LIKE UPPER(?)
+        ORDER BY CASE WHEN UPPER(username) LIKE UPPER(?) THEN 0 ELSE 1 END, username ASC
+        FETCH FIRST 25 ROWS ONLY""",
         (v, like, like, q + "%")).fetchall()
     c.close()
     return [{**dict(r), "is_following": bool(r["is_following"])} for r in rows]
@@ -879,11 +789,12 @@ def news_delete(b: NewsDel):
 def news(user_id: Optional[int] = None):
     v = user_id if user_id is not None else -1
     c = db()
-    rows = c.execute("""SELECT TOP 20 n.*,
+    rows = c.execute("""SELECT n.*,
         (SELECT COUNT(*) FROM news_likes l WHERE l.news_id=n.id) likes_count,
         (SELECT COUNT(*) FROM news_comments m WHERE m.news_id=n.id) comments_count,
         (SELECT 1 FROM news_likes l WHERE l.news_id=n.id AND l.user_id=?) my_like
-        FROM school_news n ORDER BY n.id DESC""", (v,)).fetchall()
+        FROM school_news n ORDER BY n.id DESC
+        FETCH FIRST 20 ROWS ONLY""", (v,)).fetchall()
     c.close(); return [dict(r) for r in rows]
 
 @app.post("/api/news/like")
@@ -907,7 +818,7 @@ def news_comment(b: NewsComment):
 def news_comments(news_id: int, viewer_id: Optional[int] = None):
     v = viewer_id if viewer_id is not None else -1
     c = db()
-    rows = c.execute("""SELECT m.id,m.content,m.[timestamp],u.username,u.fullname,u.avatar_base64,u.can_post_news,
+    rows = c.execute("""SELECT m.id,m.content,m.created_at,u.username,u.fullname,u.avatar_base64,u.can_post_news,
         (SELECT COUNT(*) FROM news_comment_likes cl WHERE cl.comment_id=m.id) likes_count,
         (SELECT 1 FROM news_comment_likes cl WHERE cl.comment_id=m.id AND cl.user_id=?) my_like
         FROM news_comments m JOIN users u ON u.id=m.user_id WHERE m.news_id=? ORDER BY m.id ASC""",
@@ -939,17 +850,20 @@ def news_comment_delete(b: NewsCommentDel):
 def notifications(user_id: int):
     c = db()
     out = []
-    for r in c.execute("""SELECT TOP 10 l.[timestamp] ts, u.username, u.fullname, p.content snippet FROM likes l
+    for r in c.execute("""SELECT l.created_at ts, u.username, u.fullname, p.content snippet FROM likes l
         JOIN posts p ON p.id=l.post_id JOIN users u ON u.id=l.user_id
-        WHERE p.user_id=? AND l.user_id!=? AND l.is_like=1 ORDER BY l.id DESC""",
+        WHERE p.user_id=? AND l.user_id!=? AND l.is_like=1 ORDER BY l.id DESC
+        FETCH FIRST 10 ROWS ONLY""",
         (user_id, user_id)).fetchall():
         out.append({"type": "like", **dict(r)})
-    for r in c.execute("""SELECT TOP 10 m.[timestamp] ts, u.username, u.fullname, m.content snippet FROM comments m
+    for r in c.execute("""SELECT m.created_at ts, u.username, u.fullname, m.content snippet FROM comments m
         JOIN posts p ON p.id=m.post_id JOIN users u ON u.id=m.user_id
-        WHERE p.user_id=? AND m.user_id!=? ORDER BY m.id DESC""",
+        WHERE p.user_id=? AND m.user_id!=? ORDER BY m.id DESC
+        FETCH FIRST 10 ROWS ONLY""",
         (user_id, user_id)).fetchall():
         out.append({"type": "comment", **dict(r)})
-    for r in c.execute("SELECT TOP 5 [timestamp] ts, author username, author fullname, title snippet FROM school_news ORDER BY id DESC").fetchall():
+    for r in c.execute("""SELECT created_at ts, author username, author fullname, title snippet FROM school_news
+        ORDER BY id DESC FETCH FIRST 5 ROWS ONLY""").fetchall():
         out.append({"type": "news", **dict(r)})
     c.close()
     out.sort(key=lambda x: x["ts"] or "", reverse=True)
