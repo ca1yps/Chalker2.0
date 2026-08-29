@@ -29,8 +29,8 @@ from pydantic import BaseModel
 # quickstart script Oracle Cloud gave you -- python-oracledb's default
 # "thin" mode speaks this natively, no Oracle Instant Client install
 # required on Render.
-ORACLE_USER = os.getenv("ORACLE_DB_USER", "USER_NAME")
-ORACLE_PASSWORD = os.getenv("ORACLE_DB_PASSWORD", "PASSWORD")
+ORACLE_USER = os.getenv("ORACLE_DB_USER", "ADMIN")
+ORACLE_PASSWORD = os.getenv("ORACLE_DB_PASSWORD", "Ilyo$6eey06072009")
 ORACLE_DSN = os.getenv(
     "ORACLE_DB_DSN",
     "(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)"
