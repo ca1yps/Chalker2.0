@@ -1,7 +1,5 @@
 fastapi
-uvicorn[standard]
-python-multipart
-pydantic
-boto3
+uvicorn
 psycopg2-binary
-
+boto3
+pydantic
