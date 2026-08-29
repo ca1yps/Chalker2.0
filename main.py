@@ -11,15 +11,20 @@ from botocore.client import Config as _BotoConfig
 import psycopg2
 from psycopg2 import pool
 
-from fastapi import FastAPI, Form, File, UploadFile
+from fastapi import FastAPI, Form, File, UploadFile, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
+
 # CockroachDB / PostgreSQL ulanish manzili
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    os.getenv("COCKROACH_URL", "postgresql://ilyosbe:ke1He_7qkyj9_V1WvDZqdw@winged-bison-19941.jxf.gcp-europe-west3.cockroachlabs.cloud:26257/defaultdb?sslmode=require")
-)
+# MUHIM: parol va manzil endi FAQAT environment variable orqali beriladi.
+# Kodga hech qachon haqiqiy DB parolini yozib qo'ymang (git/GitHub'ga tushib qolishi mumkin).
+DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("COCKROACH_URL")
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL (yoki COCKROACH_URL) environment variable topilmadi. "
+        "Render'da Environment bo'limiga CockroachDB connection string'ini qo'shing."
+    )
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 _INDEX_CANDIDATES = [
@@ -29,7 +34,16 @@ _INDEX_CANDIDATES = [
 INDEX = next((p for p in _INDEX_CANDIDATES if os.path.exists(p)), _INDEX_CANDIDATES[-1])
 
 app = FastAPI(title="Chalker")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
+
+@app.exception_handler(Exception)
+async def _global_error_handler(request: Request, exc: Exception):
+    # Har qanday kutilmagan xato (masalan: DB ulanishi vaqtincha uzilishi,
+    # CockroachDB klasteri "uyquda" bo'lishi, connection pool band bo'lib qolishi)
+    # endi umumiy "Server error (500)" o'rniga ANIQ matn bilan qaytadi,
+    # va butun ilova qulab tushmaydi.
+    print(f"[UNHANDLED ERROR] {request.method} {request.url.path} -> {type(exc).__name__}: {exc}")
+    return JSONResponse({"error": f"Kutilmagan server xatosi: {exc}"}, status_code=500)
 
 _POOL_MIN = 1
 _POOL_MAX = 10
@@ -625,12 +639,28 @@ def comments(post_id: int, viewer_id: Optional[int] = None):
 @app.post("/api/comments/like")
 def comment_like(b: CommentLikeReq):
     c = db()
-    if c.execute("SELECT 1 FROM comment_likes WHERE user_id=? AND comment_id=?", (b.user_id, b.comment_id)).fetchone():
-        c.execute("DELETE FROM comment_likes WHERE user_id=? AND comment_id=?", (b.user_id, b.comment_id)); liked = False
-    else:
-        c.execute("INSERT INTO comment_likes(user_id,comment_id) VALUES(?,?)", (b.user_id, b.comment_id)); liked = True
-    cnt = c.execute("SELECT COUNT(*) cnt FROM comment_likes WHERE comment_id=?", (b.comment_id,)).fetchone()["cnt"]
-    c.commit(); c.close(); return {"liked": liked, "count": cnt}
+    try:
+        deleted = c.execute(
+            "DELETE FROM comment_likes WHERE user_id=? AND comment_id=? RETURNING id",
+            (b.user_id, b.comment_id)
+        ).fetchone()
+        if deleted:
+            liked = False
+        else:
+            c.execute(
+                "INSERT INTO comment_likes(user_id,comment_id) VALUES(?,?) ON CONFLICT (user_id,comment_id) DO NOTHING",
+                (b.user_id, b.comment_id)
+            )
+            liked = True
+        cnt = c.execute("SELECT COUNT(*) cnt FROM comment_likes WHERE comment_id=?", (b.comment_id,)).fetchone()["cnt"]
+        c.commit()
+        return {"liked": liked, "count": cnt}
+    except psycopg2.errors.ForeignKeyViolation:
+        return err("Bu komment allaqachon o'chirilgan. Sahifani yangilang.", 409)
+    except Exception as e:
+        return err(f"Layk bosishda xatolik: {e}", 500)
+    finally:
+        c.close()
 
 @app.post("/api/comments/delete")
 def comment_delete(b: CommentDel):
@@ -640,6 +670,13 @@ def comment_delete(b: CommentDel):
     requester = urow(c, b.user_id)
     if r["user_id"] != b.user_id and not (requester and requester["username"] == "boss"):
         c.close(); return err("Ruxsat yo'q!", 403)
+    # Kommentga (va uning javoblariga) tegishli laykларни ham tozalab tashlaymiz,
+    # aks holda "yetim" comment_likes qatorlari qolib, keyinchalik FK xatosiga olib keladi.
+    child_ids = [x["id"] for x in c.execute(
+        "SELECT id FROM comments WHERE id=? OR parent_id=?", (b.comment_id, b.comment_id)
+    ).fetchall()]
+    for cid in child_ids:
+        c.execute("DELETE FROM comment_likes WHERE comment_id=?", (cid,))
     c.execute("DELETE FROM comments WHERE id=? OR parent_id=?", (b.comment_id, b.comment_id))
     c.commit(); c.close(); return {"success": True}
 
@@ -736,12 +773,28 @@ def news_comments(news_id: int, viewer_id: Optional[int] = None):
 @app.post("/api/news/comments/like")
 def news_comment_like(b: NewsCommentLikeReq):
     c = db()
-    if c.execute("SELECT 1 FROM news_comment_likes WHERE user_id=? AND comment_id=?", (b.user_id, b.comment_id)).fetchone():
-        c.execute("DELETE FROM news_comment_likes WHERE user_id=? AND comment_id=?", (b.user_id, b.comment_id)); liked = False
-    else:
-        c.execute("INSERT INTO news_comment_likes(user_id,comment_id) VALUES(?,?)", (b.user_id, b.comment_id)); liked = True
-    cnt = c.execute("SELECT COUNT(*) cnt FROM news_comment_likes WHERE comment_id=?", (b.comment_id,)).fetchone()["cnt"]
-    c.commit(); c.close(); return {"liked": liked, "count": cnt}
+    try:
+        deleted = c.execute(
+            "DELETE FROM news_comment_likes WHERE user_id=? AND comment_id=? RETURNING id",
+            (b.user_id, b.comment_id)
+        ).fetchone()
+        if deleted:
+            liked = False
+        else:
+            c.execute(
+                "INSERT INTO news_comment_likes(user_id,comment_id) VALUES(?,?) ON CONFLICT (user_id,comment_id) DO NOTHING",
+                (b.user_id, b.comment_id)
+            )
+            liked = True
+        cnt = c.execute("SELECT COUNT(*) cnt FROM news_comment_likes WHERE comment_id=?", (b.comment_id,)).fetchone()["cnt"]
+        c.commit()
+        return {"liked": liked, "count": cnt}
+    except psycopg2.errors.ForeignKeyViolation:
+        return err("Bu komment allaqachon o'chirilgan. Sahifani yangilang.", 409)
+    except Exception as e:
+        return err(f"Layk bosishda xatolik: {e}", 500)
+    finally:
+        c.close()
 
 @app.post("/api/news/comments/delete")
 def news_comment_delete(b: NewsCommentDel):
@@ -751,6 +804,7 @@ def news_comment_delete(b: NewsCommentDel):
     requester = urow(c, b.user_id)
     if r["user_id"] != b.user_id and not (requester and requester["username"] == "boss"):
         c.close(); return err("Ruxsat yo'q!", 403)
+    c.execute("DELETE FROM news_comment_likes WHERE comment_id=?", (b.comment_id,))
     c.execute("DELETE FROM news_comments WHERE id=?", (b.comment_id,))
     c.commit(); c.close(); return {"success": True}
 
