@@ -1,5 +1,7 @@
 import os
+import queue
 import re
+import threading
 import time
 import uuid
 from typing import Optional
@@ -7,25 +9,17 @@ from typing import Optional
 import boto3
 from botocore.client import Config as _BotoConfig
 import psycopg2
-from psycopg2 import pool as _pgpool
+from psycopg2 import pool
 
 from fastapi import FastAPI, Form, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
-# ---------------------------------------------------------------------------
-# Database connection (CockroachDB, via psycopg2 -- CockroachDB speaks the
-# PostgreSQL wire protocol, so the standard Postgres driver works as-is)
-# ---------------------------------------------------------------------------
-# Set DATABASE_URL in your host's Environment settings (Render ->
-# Environment), never commit the real password into the repo / git history.
-# It must include sslmode=verify-full and point at the CA cert file (see the
-# deployment notes for how that file gets onto Render). Example shape:
-#   postgresql://ilyosbe:<PAROL>@winged-bison-19941.jxf.gcp-europe-west3.cockroachlabs.cloud:26257/defaultdb?sslmode=verify-full&sslrootcert=/etc/secrets/cc-ca.crt
+# CockroachDB / PostgreSQL ulanish manzili
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://ilyosbe:PASSWORD@winged-bison-19941.jxf.gcp-europe-west3.cockroachlabs.cloud:26257/defaultdb?sslmode=verify-full",
+    os.getenv("COCKROACH_URL", "postgresql://ilyosbe:ke1He_7qkyj9_V1WvDZqdw@winged-bison-19941.jxf.gcp-europe-west3.cockroachlabs.cloud:26257/defaultdb?sslmode=require")
 )
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -34,61 +28,57 @@ _INDEX_CANDIDATES = [
     os.path.join(_BASE_DIR, "index.html"),
 ]
 INDEX = next((p for p in _INDEX_CANDIDATES if os.path.exists(p)), _INDEX_CANDIDATES[-1])
+
 app = FastAPI(title="Chalker")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+_POOL_MIN = 1
+_POOL_MAX = 10
+_pg_pool = None
+_pool_lock = threading.Lock()
 
-# ---------------------------------------------------------------------------
-# Connection pool
-# ---------------------------------------------------------------------------
-# psycopg2 ships a real thread-safe pool (psycopg2.pool.ThreadedConnectionPool),
-# so -- unlike the Azure SQL/pyodbc version -- there's no need to hand-roll
-# one with a queue.Queue.
-# ---------------------------------------------------------------------------
-_POOL_SIZE = 5
+def get_pool():
+    global _pg_pool
+    if _pg_pool is None:
+        with _pool_lock:
+            if _pg_pool is None:
+                _pg_pool = pool.ThreadedConnectionPool(
+                    minconn=_POOL_MIN,
+                    maxconn=_POOL_MAX,
+                    dsn=DATABASE_URL
+                )
+    return _pg_pool
 
+def _format_sql(sql: str) -> str:
+    """SQL so'rovidagi '?' belgilari o'rniga CockroachDB/Postgres bind parametrlarini (%s),
+    'SELECT TOP N' o'rniga 'LIMIT N', va RETURNING... shakllarini moslashtiradi."""
+    # TOP N ni LIMIT N ga o'girish
+    top_match = re.search(r'\bSELECT\s+TOP\s+(\d+)\s+', sql, flags=re.IGNORECASE)
+    limit_clause = ""
+    if top_match:
+        limit_count = top_match.group(1)
+        sql = re.sub(r'\bSELECT\s+TOP\s+\d+\s+', 'SELECT ', sql, flags=re.IGNORECASE)
+        limit_clause = f" LIMIT {limit_count}"
 
-def _new_pool_with_retry(retries=10, delay=6):
-    """CockroachDB Cloud (Basic/Serverless free tier) doesn't force-pause
-    the way Azure's serverless SQL tier does, but the very first connection
-    right after a fresh deploy can still occasionally hit a transient
-    network/TLS hiccup. Retry a few times instead of crashing the whole app
-    on deploy."""
-    last_err = None
-    for attempt in range(1, retries + 1):
-        try:
-            return _pgpool.ThreadedConnectionPool(1, _POOL_SIZE, dsn=DATABASE_URL)
-        except psycopg2.Error as e:
-            last_err = e
-            if attempt < retries:
-                time.sleep(delay)
-    raise last_err
+    # RETURNING ... INTO ? shaklini CockroachDB RETURNING id ga o'girish
+    sql = re.sub(r'\bRETURNING\s+(\w+)\s+INTO\s+\?', r'RETURNING \1', sql, flags=re.IGNORECASE)
 
+    # SQL da [timestamp] qavslarini olib tashlash
+    sql = sql.replace("[timestamp]", "timestamp")
 
-_pool = _new_pool_with_retry()
+    # '?' belgilari o'rniga %s o'rnatish
+    formatted_sql = sql.replace("?", "%s")
 
-
-def _qmark_to_pg(sql):
-    """psycopg2 uses '%s' placeholders instead of pyodbc/sqlite3's '?' --
-    translating here means every query string elsewhere in this file could
-    stay exactly as written."""
-    return sql.replace("?", "%s")
-
+    if limit_clause:
+        formatted_sql += limit_clause
+    return formatted_sql
 
 class _CursorWrap:
-    """Wraps a psycopg2 cursor so fetchone()/fetchall() return plain dicts
-    keyed by column name -- psycopg2 cursors only support index access by
-    default, but the rest of this file was written expecting
-    RealDictCursor-style dict rows (r["colname"], dict(r), etc). Postgres
-    (and CockroachDB) already return unquoted identifiers in lowercase
-    exactly as written in the query, so no case-normalizing is needed
-    here (unlike the Oracle attempt, which uppercases everything)."""
-
     def __init__(self, cur):
         self._cur = cur
 
     def _cols(self):
-        return [d[0] for d in self._cur.description] if self._cur.description else []
+        return [d[0].lower() for d in self._cur.description] if self._cur.description else []
 
     def fetchone(self):
         row = self._cur.fetchone()
@@ -97,50 +87,48 @@ class _CursorWrap:
         return dict(zip(self._cols(), row))
 
     def fetchall(self):
+        if not self._cur.description:
+            return []
         cols = self._cols()
         return [dict(zip(cols, row)) for row in self._cur.fetchall()]
 
-
 class Conn:
-    """Thin wrapper so the rest of the file can keep using the same
-    sqlite3-style pattern: c.execute(sql, params).fetchone()/.fetchall(),
-    c.commit(), c.close() -- but talking to CockroachDB underneath via
-    psycopg2, borrowing a connection from the pool for the lifetime of one
-    request."""
-
     def __init__(self):
-        self._conn = _pool.getconn()
+        self._conn = get_pool().getconn()
         self._returned = False
         self._broken = False
 
     def execute(self, sql, params=()):
         try:
             cur = self._conn.cursor()
-            cur.execute(_qmark_to_pg(sql), tuple(params))
+            formatted_sql = _format_sql(sql)
+            cur.execute(formatted_sql, tuple(params))
             return _CursorWrap(cur)
-        except psycopg2.Error:
-            # The pooled connection dropped/went stale. Open a fresh
-            # standalone connection for the rest of this request instead
-            # of bubbling up a 500 for something a reconnect fixes. It's
-            # closed (not returned to the pool) when the request finishes,
-            # since the pool only tracks connections it handed out itself.
+        except Exception:
             try:
-                self._conn.close()
-            except Exception:
-                pass
-            self._broken = True
-            self._conn = psycopg2.connect(DATABASE_URL)
-            cur = self._conn.cursor()
-            cur.execute(_qmark_to_pg(sql), tuple(params))
-            return _CursorWrap(cur)
+                get_pool().putconn(self._conn, close=True)
+                self._conn = get_pool().getconn()
+                cur = self._conn.cursor()
+                formatted_sql = _format_sql(sql)
+                cur.execute(formatted_sql, tuple(params))
+                return _CursorWrap(cur)
+            except Exception as e:
+                self._broken = True
+                raise e
 
-    def execute_insert_returning_id(self, sql, params=()):
-        """For INSERTs that need the new row's id back. Postgres/CockroachDB
-        support this natively with a RETURNING clause -- no special output
-        variable dance needed like Oracle."""
-        cur = self._conn.cursor()
-        cur.execute(f"{_qmark_to_pg(sql)} RETURNING id", tuple(params))
-        return cur.fetchone()[0]
+    def execute_insert_id(self, sql, params=()):
+        """Yangi qator qo'shilganda generatsiya qilingan ID ni qaytaruvchi yordamchi usul."""
+        try:
+            cur = self._conn.cursor()
+            formatted_sql = _format_sql(sql)
+            cur.execute(formatted_sql, tuple(params))
+            row = cur.fetchone()
+            if row:
+                return int(row[0])
+            return None
+        except Exception as e:
+            self._broken = True
+            raise e
 
     def commit(self):
         self._conn.commit()
@@ -149,166 +137,144 @@ class Conn:
         if self._returned:
             return
         self._returned = True
-        if self._broken:
-            try:
-                self._conn.close()
-            except Exception:
-                pass
-            return
         try:
-            self._conn.rollback()
+            if not self._broken:
+                self._conn.rollback()
+            get_pool().putconn(self._conn, close=self._broken)
         except Exception:
             pass
-        try:
-            _pool.putconn(self._conn)
-        except Exception:
-            try:
-                self._conn.close()
-            except Exception:
-                pass
 
     def __del__(self):
-        # Safety net: if an endpoint throws before calling c.close() (a
-        # bug, an unexpected error, etc.) the connection still gets
-        # returned to the pool here once the Conn object is
-        # garbage-collected, instead of being leaked forever.
         try:
             self.close()
         except Exception:
             pass
 
-
 def db():
     return Conn()
-
 
 def init():
     c = db()
     statements = [
-        """CREATE TABLE IF NOT EXISTS users(
-          id SERIAL PRIMARY KEY,
-          username VARCHAR(255) UNIQUE NOT NULL,
-          fullname VARCHAR(255),
-          school_class VARCHAR(255),
-          school_name VARCHAR(255),
-          country VARCHAR(255),
-          region VARCHAR(255),
-          district VARCHAR(255),
-          role VARCHAR(50) DEFAULT 'student',
-          birth_date VARCHAR(50),
-          hide_birth_date INT DEFAULT 0,
-          bio TEXT,
-          heart_status VARCHAR(50) DEFAULT 'Available',
-          avatar_base64 TEXT,
-          can_post_news INT DEFAULT 0,
-          password VARCHAR(255) NOT NULL,
-          university VARCHAR(255)
-        )""",
-        """CREATE TABLE IF NOT EXISTS posts(
-          id SERIAL PRIMARY KEY,
-          user_id INT NOT NULL,
-          content TEXT,
-          media_base64 TEXT,
-          media_type VARCHAR(50),
-          created_at VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
-        )""",
-        """CREATE TABLE IF NOT EXISTS comments(
-          id SERIAL PRIMARY KEY,
-          post_id INT NOT NULL,
-          user_id INT NOT NULL,
-          parent_id INT,
-          content TEXT NOT NULL,
-          created_at VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
-        )""",
-        """CREATE TABLE IF NOT EXISTS likes(
-          id SERIAL PRIMARY KEY,
-          user_id INT NOT NULL,
-          post_id INT NOT NULL,
-          is_like INT NOT NULL,
-          created_at VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
-        )""",
-        "CREATE UNIQUE INDEX IF NOT EXISTS iup ON likes(user_id, post_id)",
-        """CREATE TABLE IF NOT EXISTS follows(
-          follower_id INT NOT NULL,
-          following_id INT NOT NULL,
-          PRIMARY KEY(follower_id, following_id)
-        )""",
-        """CREATE TABLE IF NOT EXISTS school_news(
-          id SERIAL PRIMARY KEY,
-          title TEXT NOT NULL,
-          author VARCHAR(255),
-          created_at VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
-        )""",
-        """CREATE TABLE IF NOT EXISTS news_likes(
-          id SERIAL PRIMARY KEY,
-          user_id INT NOT NULL,
-          news_id INT NOT NULL,
-          created_at VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
-        )""",
-        "CREATE UNIQUE INDEX IF NOT EXISTS iun ON news_likes(user_id, news_id)",
-        """CREATE TABLE IF NOT EXISTS news_comments(
-          id SERIAL PRIMARY KEY,
-          news_id INT NOT NULL,
-          user_id INT NOT NULL,
-          content TEXT NOT NULL,
-          created_at VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
-        )""",
-        """CREATE TABLE IF NOT EXISTS comment_likes(
-          id SERIAL PRIMARY KEY,
-          user_id INT NOT NULL,
-          comment_id INT NOT NULL,
-          created_at VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
-        )""",
-        "CREATE UNIQUE INDEX IF NOT EXISTS iucl ON comment_likes(user_id, comment_id)",
-        """CREATE TABLE IF NOT EXISTS news_comment_likes(
-          id SERIAL PRIMARY KEY,
-          user_id INT NOT NULL,
-          comment_id INT NOT NULL,
-          created_at VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
-        )""",
-        "CREATE UNIQUE INDEX IF NOT EXISTS iuncl ON news_comment_likes(user_id, comment_id)",
-        """CREATE TABLE IF NOT EXISTS certificates(
-          id SERIAL PRIMARY KEY,
-          user_id INT NOT NULL,
-          title TEXT NOT NULL,
-          image_base64 TEXT,
-          verified INT DEFAULT 1,
-          created_at VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD HH24:MI:SS')
-        )""",
+        """CREATE TABLE IF NOT EXISTS users (
+            id INT8 PRIMARY KEY DEFAULT unique_rowid(),
+            username VARCHAR(255) UNIQUE NOT NULL,
+            fullname VARCHAR(255),
+            school_class VARCHAR(255),
+            school_name VARCHAR(255),
+            country VARCHAR(255),
+            region VARCHAR(255),
+            district VARCHAR(255),
+            role VARCHAR(50) DEFAULT 'student',
+            birth_date VARCHAR(50),
+            hide_birth_date INT2 DEFAULT 0,
+            bio TEXT,
+            heart_status VARCHAR(50) DEFAULT 'Available',
+            avatar_base64 TEXT,
+            can_post_news INT2 DEFAULT 0,
+            password VARCHAR(255) NOT NULL,
+            university VARCHAR(255)
+        );""",
+
+        """CREATE TABLE IF NOT EXISTS posts (
+            id INT8 PRIMARY KEY DEFAULT unique_rowid(),
+            user_id INT8 NOT NULL,
+            content TEXT,
+            media_base64 TEXT,
+            media_type VARCHAR(50),
+            timestamp VARCHAR(50) DEFAULT to_char(now() + interval '5 hour', 'YYYY-MM-DD HH24:MI:SS')
+        );""",
+
+        """CREATE TABLE IF NOT EXISTS comments (
+            id INT8 PRIMARY KEY DEFAULT unique_rowid(),
+            post_id INT8 NOT NULL,
+            user_id INT8 NOT NULL,
+            parent_id INT8,
+            content TEXT NOT NULL,
+            timestamp VARCHAR(50) DEFAULT to_char(now() + interval '5 hour', 'YYYY-MM-DD HH24:MI:SS')
+        );""",
+
+        """CREATE TABLE IF NOT EXISTS likes (
+            id INT8 PRIMARY KEY DEFAULT unique_rowid(),
+            user_id INT8 NOT NULL,
+            post_id INT8 NOT NULL,
+            is_like INT2 NOT NULL,
+            timestamp VARCHAR(50) DEFAULT to_char(now() + interval '5 hour', 'YYYY-MM-DD HH24:MI:SS')
+        );""",
+
+        """CREATE UNIQUE INDEX IF NOT EXISTS iup ON likes(user_id, post_id);""",
+
+        """CREATE TABLE IF NOT EXISTS follows (
+            follower_id INT8 NOT NULL,
+            following_id INT8 NOT NULL,
+            PRIMARY KEY(follower_id, following_id)
+        );""",
+
+        """CREATE TABLE IF NOT EXISTS school_news (
+            id INT8 PRIMARY KEY DEFAULT unique_rowid(),
+            title TEXT NOT NULL,
+            author VARCHAR(255),
+            timestamp VARCHAR(50) DEFAULT to_char(now() + interval '5 hour', 'YYYY-MM-DD HH24:MI:SS')
+        );""",
+
+        """CREATE TABLE IF NOT EXISTS news_likes (
+            id INT8 PRIMARY KEY DEFAULT unique_rowid(),
+            user_id INT8 NOT NULL,
+            news_id INT8 NOT NULL,
+            timestamp VARCHAR(50) DEFAULT to_char(now() + interval '5 hour', 'YYYY-MM-DD HH24:MI:SS')
+        );""",
+
+        """CREATE UNIQUE INDEX IF NOT EXISTS iun ON news_likes(user_id, news_id);""",
+
+        """CREATE TABLE IF NOT EXISTS news_comments (
+            id INT8 PRIMARY KEY DEFAULT unique_rowid(),
+            news_id INT8 NOT NULL,
+            user_id INT8 NOT NULL,
+            content TEXT NOT NULL,
+            timestamp VARCHAR(50) DEFAULT to_char(now() + interval '5 hour', 'YYYY-MM-DD HH24:MI:SS')
+        );""",
+
+        """CREATE TABLE IF NOT EXISTS comment_likes (
+            id INT8 PRIMARY KEY DEFAULT unique_rowid(),
+            user_id INT8 NOT NULL,
+            comment_id INT8 NOT NULL,
+            timestamp VARCHAR(50) DEFAULT to_char(now() + interval '5 hour', 'YYYY-MM-DD HH24:MI:SS')
+        );""",
+
+        """CREATE UNIQUE INDEX IF NOT EXISTS iucl ON comment_likes(user_id, comment_id);""",
+
+        """CREATE TABLE IF NOT EXISTS news_comment_likes (
+            id INT8 PRIMARY KEY DEFAULT unique_rowid(),
+            user_id INT8 NOT NULL,
+            comment_id INT8 NOT NULL,
+            timestamp VARCHAR(50) DEFAULT to_char(now() + interval '5 hour', 'YYYY-MM-DD HH24:MI:SS')
+        );""",
+
+        """CREATE UNIQUE INDEX IF NOT EXISTS iuncl ON news_comment_likes(user_id, comment_id);""",
+
+        """CREATE TABLE IF NOT EXISTS certificates (
+            id INT8 PRIMARY KEY DEFAULT unique_rowid(),
+            user_id INT8 NOT NULL,
+            title TEXT NOT NULL,
+            image_base64 TEXT,
+            verified INT2 DEFAULT 1,
+            timestamp VARCHAR(50) DEFAULT to_char(now() + interval '5 hour', 'YYYY-MM-DD HH24:MI:SS')
+        );""",
+
+        """ALTER TABLE users ADD COLUMN IF NOT EXISTS university VARCHAR(255);"""
     ]
-    # CREATE TABLE/INDEX IF NOT EXISTS makes every one of these safe to
-    # re-run on every deploy -- no special-case error codes to swallow like
-    # the Oracle/Azure versions needed.
+
     for stmt in statements:
         try:
             c.execute(stmt)
             c.commit()
         except Exception as e:
             print(f"[init] schema statement failed (continuing): {e}")
-            try:
-                c._conn.rollback()
-            except Exception:
-                pass
-    c.commit(); c.close()
 
+    c.close()
 
 init()
 
-
-# ---------------------------------------------------------------------------
-# Cloudflare R2 (S3-compatible) object storage -- used for ALL images (post
-# media, avatars, certificate photos). Text/post data stays in CockroachDB;
-# only the raw image bytes live in R2, so the database never has to store
-# or transfer big base64 blobs. The users/posts/certificates columns that
-# used to hold raw base64 image data (avatar_base64, media_base64,
-# image_base64) hold a plain R2 URL string instead -- column names were
-# left as-is so the DB schema didn't need extra changes, only what's
-# stored in them.
-#
-# Set these in your host's Environment settings, never commit real keys:
-#   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT_URL,
-#   R2_PUBLIC_URL, R2_BUCKET_NAME
-# ---------------------------------------------------------------------------
 R2_ACCESS_KEY = os.environ.get("R2_ACCESS_KEY_ID")
 R2_SECRET_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
 R2_ENDPOINT = os.environ.get("R2_ENDPOINT_URL")
@@ -326,12 +292,9 @@ if R2_ACCESS_KEY and R2_SECRET_KEY and R2_ENDPOINT:
         region_name="auto",
     )
 
-# Images are compressed to JPEG client-side (max ~1280px) before upload, so
-# 8MB is a generous ceiling -- this just guards direct API hits.
 IMAGE_ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
-IMAGE_MAX_SIZE = 8 * 1024 * 1024  # 8 MB
+IMAGE_MAX_SIZE = 8 * 1024 * 1024
 IMAGE_LIMIT_MSG = "Rasm hajmi 8MB dan oshmasligi va faqat (jpg, png, gif, webp) formatda bo'lishi kerak!"
-
 
 def pub(r):
     d = dict(r); d.pop("password", None); return d
@@ -343,8 +306,7 @@ def news_rights(r):
     return bool(r and (r["username"] == "boss" or r["can_post_news"] == 1))
 def clean_u(u):
     return u.strip().lower().lstrip("@")
-# Username rule: at least 5 characters, letters/digits/underscore/dot only
-# (no spaces or other symbols).
+
 _USERNAME_RE = re.compile(r"^[a-z0-9_.]{5,}$")
 _USERNAME_ERR = "Username kamida 5 belgidan iborat bo'lishi va faqat harf, raqam, \"_\" va \".\" belgilaridan tashkil topishi kerak!"
 def valid_username(u):
@@ -399,22 +361,6 @@ class CertSelfDel(BaseModel):
 def ping():
     return "OK"
 
-@app.get("/ping-db")
-def ping_db():
-    """Hit this from an external cron service (e.g. cron-job.org) every
-    hour or so. CockroachDB Cloud's free tier doesn't force-pause the way
-    Azure's serverless SQL did, but this is still a cheap health check /
-    extra safety net."""
-    try:
-        c = db()
-        try:
-            c.execute("SELECT 1").fetchall()
-        finally:
-            c.close()
-        return "OK"
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=503)
-
 @app.get("/", response_class=HTMLResponse)
 def index():
     with open(INDEX, "r", encoding="utf-8") as f:
@@ -443,8 +389,11 @@ def register(username: str = Form(...), fullname: str = Form(...), password: str
         c.close(); return err(_USERNAME_ERR)
     if len(password) < 4:
         c.close(); return err("Parol kamida 4 belgi!")
-    new_id = c.execute_insert_returning_id(
-        "INSERT INTO users(username,fullname,password) VALUES(?,?,?)", (u, fullname.strip(), password))
+
+    new_id = c.execute_insert_id(
+        "INSERT INTO users(username,fullname,password) VALUES(?,?,?) RETURNING id INTO ?",
+        (u, fullname.strip(), password)
+    )
     c.commit(); r = urow(c, new_id); c.close()
     return {"user": pub(r)}
 
@@ -577,19 +526,12 @@ def certificate_self_delete(b: CertSelfDel):
 
 @app.post("/api/upload/image")
 async def upload_image(file: UploadFile = File(...)):
-    """Generic image upload used for post media, avatars, and certificate
-    photos. Uploads the raw bytes straight to R2 and returns the public
-    URL -- the caller then stores that URL in whichever *_base64 column it
-    used to store the raw base64 data in (see the R2 comment block above)."""
     try:
         if _r2 is None:
             return err("Fayl xizmati sozlanmagan: R2 kalitlari (.env) topilmadi!", 500)
         orig_name = file.filename or "rasm.jpg"
         ext = os.path.splitext(orig_name)[1].lower()
         if ext not in IMAGE_ALLOWED_EXT:
-            # Browser-generated blobs (canvas.toBlob) often arrive without a
-            # clean filename/extension -- default to jpg since that's what
-            # the frontend's image compressor always outputs.
             ext = ".jpg"
         data = await file.read()
         if len(data) > IMAGE_MAX_SIZE:
@@ -635,7 +577,7 @@ def post_delete(b: PostDel):
 def posts(user_id: Optional[int] = None, author: Optional[str] = None):
     v = user_id if user_id is not None else -1
     c = db()
-    sql = """SELECT p.id,p.user_id,p.content,p.media_base64,p.media_type,p.created_at,
+    sql = """SELECT p.id,p.user_id,p.content,p.media_base64,p.media_type,p.timestamp,
         u.username,u.fullname,u.avatar_base64,u.can_post_news,
         (SELECT COUNT(*) FROM likes l WHERE l.post_id=p.id AND l.is_like=1) likes_count,
         (SELECT COUNT(*) FROM comments cm WHERE cm.post_id=p.id) comments_count,
@@ -673,7 +615,7 @@ def comment_create(b: CommentCreate):
 def comments(post_id: int, viewer_id: Optional[int] = None):
     v = viewer_id if viewer_id is not None else -1
     c = db()
-    rows = c.execute("""SELECT c.id,c.parent_id,c.content,c.created_at,u.username,u.fullname,
+    rows = c.execute("""SELECT c.id,c.parent_id,c.content,c.timestamp,u.username,u.fullname,
         u.avatar_base64,u.can_post_news,
         (SELECT COUNT(*) FROM comment_likes cl WHERE cl.comment_id=c.id) likes_count,
         (SELECT 1 FROM comment_likes cl WHERE cl.comment_id=c.id AND cl.user_id=?) my_like
@@ -710,13 +652,10 @@ def search(q: str = "", viewer_id: Optional[int] = None):
     c = db()
     like = f"%{q}%"
     v = viewer_id if viewer_id is not None else -1
-    # ILIKE is Postgres/CockroachDB's built-in case-insensitive LIKE --
-    # keeps search behaving the same as SQL Server's default collation did.
-    rows = c.execute("""SELECT id,username,fullname,avatar_base64,can_post_news,school_name,
+    rows = c.execute("""SELECT TOP 25 id,username,fullname,avatar_base64,can_post_news,school_name,
         (SELECT 1 FROM follows WHERE follower_id=? AND following_id=users.id) is_following
-        FROM users WHERE username ILIKE ? OR fullname ILIKE ?
-        ORDER BY CASE WHEN username ILIKE ? THEN 0 ELSE 1 END, username ASC
-        LIMIT 25""",
+        FROM users WHERE username LIKE ? OR fullname LIKE ?
+        ORDER BY CASE WHEN username LIKE ? THEN 0 ELSE 1 END, username ASC""",
         (v, like, like, q + "%")).fetchall()
     c.close()
     return [{**dict(r), "is_following": bool(r["is_following"])} for r in rows]
@@ -730,7 +669,7 @@ def follow(b: FollowReq):
     if c.execute("SELECT 1 FROM follows WHERE follower_id=? AND following_id=?", (b.follower_id, tg["id"])).fetchone():
         c.execute("DELETE FROM follows WHERE follower_id=? AND following_id=?", (b.follower_id, tg["id"])); f = False
     else:
-        c.execute("INSERT INTO follows VALUES(?,?)", (b.follower_id, tg["id"])); f = True
+        c.execute("INSERT INTO follows(follower_id,following_id) VALUES(?,?)", (b.follower_id, tg["id"])); f = True
     c.commit(); c.close(); return {"following": f}
 
 @app.post("/api/news/create")
@@ -760,12 +699,11 @@ def news_delete(b: NewsDel):
 def news(user_id: Optional[int] = None):
     v = user_id if user_id is not None else -1
     c = db()
-    rows = c.execute("""SELECT n.*,
+    rows = c.execute("""SELECT TOP 20 n.*,
         (SELECT COUNT(*) FROM news_likes l WHERE l.news_id=n.id) likes_count,
         (SELECT COUNT(*) FROM news_comments m WHERE m.news_id=n.id) comments_count,
         (SELECT 1 FROM news_likes l WHERE l.news_id=n.id AND l.user_id=?) my_like
-        FROM school_news n ORDER BY n.id DESC
-        LIMIT 20""", (v,)).fetchall()
+        FROM school_news n ORDER BY n.id DESC""", (v,)).fetchall()
     c.close(); return [dict(r) for r in rows]
 
 @app.post("/api/news/like")
@@ -789,7 +727,7 @@ def news_comment(b: NewsComment):
 def news_comments(news_id: int, viewer_id: Optional[int] = None):
     v = viewer_id if viewer_id is not None else -1
     c = db()
-    rows = c.execute("""SELECT m.id,m.content,m.created_at,u.username,u.fullname,u.avatar_base64,u.can_post_news,
+    rows = c.execute("""SELECT m.id,m.content,m.timestamp,u.username,u.fullname,u.avatar_base64,u.can_post_news,
         (SELECT COUNT(*) FROM news_comment_likes cl WHERE cl.comment_id=m.id) likes_count,
         (SELECT 1 FROM news_comment_likes cl WHERE cl.comment_id=m.id AND cl.user_id=?) my_like
         FROM news_comments m JOIN users u ON u.id=m.user_id WHERE m.news_id=? ORDER BY m.id ASC""",
@@ -821,20 +759,17 @@ def news_comment_delete(b: NewsCommentDel):
 def notifications(user_id: int):
     c = db()
     out = []
-    for r in c.execute("""SELECT l.created_at ts, u.username, u.fullname, p.content snippet FROM likes l
+    for r in c.execute("""SELECT TOP 10 l.timestamp ts, u.username, u.fullname, p.content snippet FROM likes l
         JOIN posts p ON p.id=l.post_id JOIN users u ON u.id=l.user_id
-        WHERE p.user_id=? AND l.user_id!=? AND l.is_like=1 ORDER BY l.id DESC
-        LIMIT 10""",
+        WHERE p.user_id=? AND l.user_id!=? AND l.is_like=1 ORDER BY l.id DESC""",
         (user_id, user_id)).fetchall():
         out.append({"type": "like", **dict(r)})
-    for r in c.execute("""SELECT m.created_at ts, u.username, u.fullname, m.content snippet FROM comments m
+    for r in c.execute("""SELECT TOP 10 m.timestamp ts, u.username, u.fullname, m.content snippet FROM comments m
         JOIN posts p ON p.id=m.post_id JOIN users u ON u.id=m.user_id
-        WHERE p.user_id=? AND m.user_id!=? ORDER BY m.id DESC
-        LIMIT 10""",
+        WHERE p.user_id=? AND m.user_id!=? ORDER BY m.id DESC""",
         (user_id, user_id)).fetchall():
         out.append({"type": "comment", **dict(r)})
-    for r in c.execute("""SELECT created_at ts, author username, author fullname, title snippet FROM school_news
-        ORDER BY id DESC LIMIT 5""").fetchall():
+    for r in c.execute("SELECT TOP 5 timestamp ts, author username, author fullname, title snippet FROM school_news ORDER BY id DESC").fetchall():
         out.append({"type": "news", **dict(r)})
     c.close()
     out.sort(key=lambda x: x["ts"] or "", reverse=True)
@@ -852,9 +787,6 @@ def rights(b: RightsReq):
 
 @app.post("/api/admin/delete_user")
 def admin_delete_user(b: DeleteUserReq):
-    """Boss-only: permanently removes a user and every row that references
-    them (posts, comments, likes, follows, certificates, ...) so no orphaned
-    data is left behind."""
     c = db(); boss = urow(c, b.boss_id)
     if not boss or boss["username"] != "boss": c.close(); return err("Faqat @boss!", 403)
     tu = clean_u(b.target_username)
@@ -892,7 +824,6 @@ def admin_delete_user(b: DeleteUserReq):
 
 @app.post("/api/users/remove_follower")
 def remove_follower(b: RemoveFollowerReq):
-    """Lets a user forcibly remove someone from their own followers list."""
     c = db()
     fu = c.execute("SELECT id FROM users WHERE username=?", (clean_u(b.follower_username),)).fetchone()
     if not fu: c.close(); return err("Topilmadi!", 404)
