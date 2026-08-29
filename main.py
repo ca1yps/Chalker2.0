@@ -15,7 +15,6 @@ from fastapi import FastAPI, Form, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
-
 # CockroachDB / PostgreSQL ulanish manzili
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
