@@ -30,15 +30,10 @@ from pydantic import BaseModel
 #   Linux/Render: ~/.postgresql/root.crt
 # If that file isn't present, every connection attempt fails with an SSL
 # verification error, not a credentials error.
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError(
-        "DATABASE_URL environment variable o'rnatilmagan! Render -> Environment "
-        "bo'limiga CockroachDB connection stringingizni qo'shing. Eslatma: "
-        "avval kodning ichida ochiq yozilgan parol GitHub/skrinshotlarda "
-        "ko'rinib qolgan edi -- shu parolni CockroachDB konsolida albatta "
-        "almashtiring (rotate qiling), chunki eski parol endi ishonchli emas."
-    )
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://ilyosbek:CAIsL_qC1EfkDeRKwyN98Q@chalkerdb-19950.jxf.gcp-europe-west3.cockroachlabs.cloud:26257/defaultdb?sslmode=verify-full",  # <-- Shu yerga CockroachDB connection stringingizni yozing!
+)
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 _INDEX_CANDIDATES = [
@@ -46,55 +41,7 @@ _INDEX_CANDIDATES = [
     os.path.join(_BASE_DIR, "index.html"),
 ]
 INDEX = next((p for p in _INDEX_CANDIDATES if os.path.exists(p)), _INDEX_CANDIDATES[-1])
-
-# ---------------------------------------------------------------------------
-# ASOSIY TUZATISH: like/comment "bosiladi lekin yangilangandan keyin
-# yo'qolib qoladi" muammosining sababi -- CockroachDB SERIAL ustunlari
-# unique_rowid() orqali juda katta (masalan 1205928909629358081 kabi
-# 19 xonali) sonlar hosil qiladi. JavaScript esa sonlarni float64 sifatida
-# saqlaydi va Number.MAX_SAFE_INTEGER (9 007 199 254 740 991) dan katta har
-# qanday butun sonni JSON.parse paytida avtomatik yaxlitlab (aniqligini
-# yo'qotib) qo'yadi -- frontend kodida hech qanday xato bo'lmasa ham!
-# Natijada: brauzer post/komment ID'sini noto'g'ri (yaxlitlangan) qiymat
-# sifatida qabul qiladi, like/comment-like so'rovini o'sha noto'g'ri ID bilan
-# yuboradi, backend uni DB'ga muvaffaqiyatli yozadi (shuning uchun javobda
-# "liked": true qaytadi), lekin sahifa yangilangach haqiqiy ID bo'yicha qayta
-# so'ralganda mos kelmay, "layk yo'q" bo'lib ko'rinadi.
-#
-# Yechim: shu range'dan katta har qanday butun sonni JSON javobida qo'shtirnoq
-# ichidagi STRING sifatida qaytaramiz (masalan "id": "1205928909629358081"),
-# raqam sifatida emas. Shunda JavaScript uni umuman parslamaydi va aniqligini
-# yo'qotmaydi. Frontend shu ID'larni ("id", "post_id", "user_id", ... har
-# qanday joyda) doim STRING sifatida ushlab turishi, hech qachon Number()/
-# parseInt() bilan o'girmasligi va like/comment so'rovlarida ham xuddi shu
-# string qiymatni qaytarib yuborishi kerak -- pydantic tomonda bu string
-# to'g'ridan-to'g'ri (aniqlik yo'qotmasdan) butun songa aylantiriladi.
-# ---------------------------------------------------------------------------
-_JS_MAX_SAFE_INT = 9007199254740991
-
-
-def _js_safe(obj):
-    if isinstance(obj, dict):
-        return {k: _js_safe(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_js_safe(v) for v in obj]
-    if isinstance(obj, bool):
-        return obj
-    if isinstance(obj, int) and (obj > _JS_MAX_SAFE_INT or obj < -_JS_MAX_SAFE_INT):
-        return str(obj)
-    return obj
-
-
-class SafeJSONResponse(JSONResponse):
-    """Same as JSONResponse, but recursively turns any integer outside
-    JavaScript's safe range into a string first, so huge CockroachDB
-    rowids never get silently rounded on the client."""
-
-    def render(self, content) -> bytes:
-        return super().render(_js_safe(content))
-
-
-app = FastAPI(title="Chalker", default_response_class=SafeJSONResponse)
+app = FastAPI(title="Chalker")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 
@@ -710,7 +657,7 @@ def posts(user_id: Optional[int] = None, author: Optional[str] = None):
     # ma'lumot qaytsin -- brauzer/Telegram WebView bu GET javobini
     # o'zi keshlab, keyingi safar layk bosilgan-bosilmaganini eski
     # holatda ko'rsatib qo'ymasin.
-    return SafeJSONResponse([dict(r) for r in rows], headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
+    return JSONResponse([dict(r) for r in rows], headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
 
 @app.post("/api/posts/like")
 def post_like(b: LikeReq):
@@ -743,7 +690,7 @@ def comments(post_id: int, viewer_id: Optional[int] = None):
         FROM comments c JOIN users u ON u.id=c.user_id
         WHERE c.post_id=%s ORDER BY c.id ASC""", (v, post_id)).fetchall()
     c.close()
-    return SafeJSONResponse([dict(r) for r in rows], headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
+    return JSONResponse([dict(r) for r in rows], headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
 
 @app.post("/api/comments/like")
 def comment_like(b: CommentLikeReq):
