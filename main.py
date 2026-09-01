@@ -3,6 +3,7 @@ import re
 import threading
 import time
 import uuid
+import json
 from typing import Optional
 
 import boto3
@@ -11,7 +12,7 @@ import psycopg2
 import psycopg2.pool
 from psycopg2.extras import RealDictCursor
 
-from fastapi import FastAPI, Form, File, UploadFile
+from fastapi import FastAPI, Form, File, UploadFile, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
@@ -19,9 +20,10 @@ from pydantic import BaseModel
 # ---------------------------------------------------------------------------
 # Database connection (CockroachDB -- Postgres wire-compatible, via psycopg2)
 # ---------------------------------------------------------------------------
-# Set DATABASE_URL in your host's Environment settings (Render -> Environment)
-# -- never commit the real password into the repo / git history. Example
-# value (CockroachDB Cloud connection string):
+# MUHIM: parol/manzil endi FAQAT environment variable orqali beriladi.
+# Kodga hech qachon haqiqiy DB parolini yozib qo'ymang (git/GitHub'ga
+# tushib qolishi mumkin -- oldingi versiyada aynan shu sodir bo'lgan edi).
+# Render -> Environment bo'limiga DATABASE_URL ni qo'shing, masalan:
 #   postgresql://<user>:<password>@<host>:26257/<db>?sslmode=verify-full
 #
 # sslmode=verify-full needs the cluster's CA certificate on disk (see the
@@ -30,10 +32,12 @@ from pydantic import BaseModel
 #   Linux/Render: ~/.postgresql/root.crt
 # If that file isn't present, every connection attempt fails with an SSL
 # verification error, not a credentials error.
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://ilyosbek:CAIsL_qC1EfkDeRKwyN98Q@chalkerdb-19950.jxf.gcp-europe-west3.cockroachlabs.cloud:26257/defaultdb?sslmode=verify-full",  # <-- Shu yerga CockroachDB connection stringingizni yozing!
-)
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL environment variable topilmadi. "
+        "Render'da Environment bo'limiga CockroachDB connection string'ini qo'shing."
+    )
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 _INDEX_CANDIDATES = [
@@ -41,8 +45,49 @@ _INDEX_CANDIDATES = [
     os.path.join(_BASE_DIR, "index.html"),
 ]
 INDEX = next((p for p in _INDEX_CANDIDATES if os.path.exists(p)), _INDEX_CANDIDATES[-1])
-app = FastAPI(title="Chalker")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+# ---------------------------------------------------------------------------
+# JavaScript's Number type only represents integers exactly up to 2^53-1.
+# This DB's older tables (posts, comments, likes, ...) still use CockroachDB's
+# unique_rowid() ids, which are 64-bit and almost always bigger than that.
+# When such an id travels to the browser as a plain JSON number, the browser
+# silently rounds it -- so the id the frontend later sends back for a
+# like/comment/delete is no longer the real id, and the like either attaches
+# to the wrong row or is rejected. Fix: send any such big integer as a JSON
+# *string* instead, which JavaScript keeps 100% exact. FastAPI/pydantic
+# already accept numeric strings for `int` fields on the way back in, so
+# nothing else about the API has to change -- BUT the frontend HTML/JS must
+# also wrap these ids in quotes wherever it embeds them into onclick="..."
+# handlers, otherwise the browser re-parses them as a numeric literal and
+# loses precision a second time at click-time. Both sides need this.
+# ---------------------------------------------------------------------------
+_JS_MAX_SAFE_INT = 9007199254740991  # 2^53 - 1
+
+def _bigint_safe(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and (value > _JS_MAX_SAFE_INT or value < -_JS_MAX_SAFE_INT):
+        return str(value)
+    if isinstance(value, dict):
+        return {k: _bigint_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_bigint_safe(v) for v in value]
+    return value
+
+class BigIntSafeJSONResponse(JSONResponse):
+    def render(self, content) -> bytes:
+        return json.dumps(
+            _bigint_safe(content),
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+app = FastAPI(title="Chalker", default_response_class=BigIntSafeJSONResponse)
+# allow_credentials=True bilan allow_origins=["*"] birga ishlatilishi brauzer
+# standartlariga zid (va kerak ham emas -- frontend cookie emas, user_id
+# orqali ishlaydi), shuning uchun False qilindi.
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
 
 
 @app.exception_handler(psycopg2.IntegrityError)
@@ -52,10 +97,22 @@ def _integrity_error_handler(request, exc):
     that was already deleted, a double-click race creating a duplicate,
     etc -- not a real server bug. Surface it as a normal 409 with a
     friendly message instead of a raw 500 traceback."""
-    return JSONResponse(
+    return BigIntSafeJSONResponse(
         {"error": "Bu amalni bajarib bo'lmadi: bog'liq ma'lumot topilmadi yoki avval o'chirilgan. Sahifani yangilab qayta urinib ko'ring."},
         status_code=409,
     )
+
+
+@app.exception_handler(Exception)
+async def _global_error_handler(request: Request, exc: Exception):
+    # Har qanday BOSHQA kutilmagan xato (masalan: DB ulanishi vaqtincha
+    # uzilishi, CockroachDB klasteri "uyquda" bo'lishi, connection pool band
+    # bo'lib qolishi) endi umumiy "Server error (500)" o'rniga ANIQ matn
+    # bilan qaytadi, va butun ilova qulab tushmaydi. psycopg2.IntegrityError
+    # yuqoridagi maxsus handler orqali allaqachon ushlanadi, bu yerga
+    # kelmaydi.
+    print(f"[UNHANDLED ERROR] {request.method} {request.url.path} -> {type(exc).__name__}: {exc}")
+    return BigIntSafeJSONResponse({"error": f"Kutilmagan server xatosi: {exc}"}, status_code=500)
 
 
 # ---------------------------------------------------------------------------
@@ -343,7 +400,7 @@ IMAGE_LIMIT_MSG = "Rasm hajmi 8MB dan oshmasligi va faqat (jpg, png, gif, webp) 
 def pub(r):
     d = dict(r); d.pop("password", None); return d
 def err(m, s=400):
-    return JSONResponse({"error": m}, status_code=s)
+    return BigIntSafeJSONResponse({"error": m}, status_code=s)
 def urow(c, uid):
     return c.execute("SELECT * FROM users WHERE id=%s", (uid,)).fetchone()
 def news_rights(r):
@@ -418,7 +475,7 @@ def ping_db():
             c.close()
         return "OK"
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=503)
+        return BigIntSafeJSONResponse({"error": str(e)}, status_code=503)
 
 @app.get("/", response_class=HTMLResponse)
 def index():
@@ -657,7 +714,7 @@ def posts(user_id: Optional[int] = None, author: Optional[str] = None):
     # ma'lumot qaytsin -- brauzer/Telegram WebView bu GET javobini
     # o'zi keshlab, keyingi safar layk bosilgan-bosilmaganini eski
     # holatda ko'rsatib qo'ymasin.
-    return JSONResponse([dict(r) for r in rows], headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
+    return BigIntSafeJSONResponse([dict(r) for r in rows], headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
 
 @app.post("/api/posts/like")
 def post_like(b: LikeReq):
@@ -690,7 +747,7 @@ def comments(post_id: int, viewer_id: Optional[int] = None):
         FROM comments c JOIN users u ON u.id=c.user_id
         WHERE c.post_id=%s ORDER BY c.id ASC""", (v, post_id)).fetchall()
     c.close()
-    return JSONResponse([dict(r) for r in rows], headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
+    return BigIntSafeJSONResponse([dict(r) for r in rows], headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
 
 @app.post("/api/comments/like")
 def comment_like(b: CommentLikeReq):
