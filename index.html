@@ -748,10 +748,12 @@ async function delCmt(postId, commentId) {
 }
 
 function setRep(p, c, u) {
-  rT[p] = { id: c };
-  var h = $("rh-" + p);
-  if (h) {
-    h.innerHTML = "@" + u + " <span class='cursor-pointer text-red-400' onclick='cnlRep(" + p + ")'>x</span>";
+  rT[p] = { id: c, mention: "@" + u + " " };
+  var i = $("ci-" + p);
+  if (i) {
+    i.value = rT[p].mention;
+    i.focus();
+    if (i.setSelectionRange) { var L = i.value.length; i.setSelectionRange(L, L); }
   }
 }
 
@@ -764,12 +766,21 @@ function cnlRep(p) {
 async function sendCmt(p) {
   var i = $("ci-" + p);
   if (!i) return;
-  var c = i.value.trim();
+  var raw = i.value;
+  var c = raw.trim();
   if (!c) return;
+  // Instagram-uslubida: agar foydalanuvchi "@username " matnini o'chirib
+  // tashlagan/o'zgartirgan bo'lsa, bu oddiy komment hisoblanadi (reply emas).
+  var parent = (rT[p] && raw.indexOf(rT[p].mention) === 0) ? rT[p].id : null;
   try {
-    await api("/comments/create", pj({ user_id: me?.id, post_id: p, content: c, parent_id: rT[p] ? rT[p].id : null }));
+    await api("/comments/create", pj({ user_id: me?.id, post_id: p, content: c, parent_id: parent }));
     i.value = "";
-    cnlRep(p);
+    delete rT[p];
+    if (pCache[p]) {
+      pCache[p].comments_count = (pCache[p].comments_count || 0) + 1;
+      var countBtn = $("cmBtn-" + p);
+      if (countBtn) countBtn.innerHTML = countBtn.innerHTML.replace(/\d+\s*$/, pCache[p].comments_count);
+    }
     oC[p] = true;
     loadCmts(p);
   } catch (e) {
@@ -996,11 +1007,21 @@ function doSearch(){
   }catch(e){alert(e.message)}
  },300)}
 async function srchFollow(u,btn){
+ if(btn.dataset.busy==="1")return;btn.dataset.busy="1";
+ var was=btn.textContent===t("uf");
+ if(was){btn.textContent=t("fl");btn.className="shrink-0 bb text-white font-bold rounded-full px-4 py-1.5 text-xs"}
+ else{btn.textContent=t("uf");btn.className="shrink-0 border brd font-bold rounded-full px-4 py-1.5 text-xs"}
  try{
   var d=await api("/users/follow",pj({follower_id:me.id,following_username:u}));
   if(d.following){btn.textContent=t("uf");btn.className="shrink-0 border brd font-bold rounded-full px-4 py-1.5 text-xs"}
   else{btn.textContent=t("fl");btn.className="shrink-0 bb text-white font-bold rounded-full px-4 py-1.5 text-xs"}
- }catch(e){alert(e.message)}}
+ }catch(e){
+  if(was){btn.textContent=t("uf");btn.className="shrink-0 border brd font-bold rounded-full px-4 py-1.5 text-xs"}
+  else{btn.textContent=t("fl");btn.className="shrink-0 bb text-white font-bold rounded-full px-4 py-1.5 text-xs"}
+  alert(e.message)
+ }
+ btn.dataset.busy="0"
+}
 
 /* NOTIFICATIONS */
 async function loadNotifs(mark){try{
@@ -1060,7 +1081,26 @@ async function loadProfilePage(u,isSelf){try{
   loadTrophy(d.username,isSelf);loadUserPosts(d.username)
  }
 }catch(e){alert(e.message)}}
-async function tglFollowVP(){try{await api("/users/follow",pj({follower_id:me.id,following_username:mUser.username}));loadProfilePage(mUser.username,false)}catch(e){alert(e.message)}}
+async function tglFollowVP(){
+ if(!mUser||tglFollowVP._busy)return;tglFollowVP._busy=true;
+ var was=!!mUser.is_following,prevFw=mUser.followers||0;
+ mUser.is_following=!was;mUser.followers=was?prevFw-1:prevFw+1;
+ var b=$("vpFollowBtn");
+ if(b){b.textContent=mUser.is_following?t("uf"):t("fl");b.className="bb text-white font-bold rounded-full px-5 py-2 text-sm"+(mUser.is_following?" border brd":"")}
+ var fw=$("vpFw");if(fw)fw.textContent=mUser.followers;
+ try{
+  var d=await api("/users/follow",pj({follower_id:me.id,following_username:mUser.username}));
+  mUser.is_following=d.following;mUser.followers=prevFw+(d.following?1:0)-(was?1:0);
+  if(b){b.textContent=mUser.is_following?t("uf"):t("fl");b.className="bb text-white font-bold rounded-full px-5 py-2 text-sm"+(mUser.is_following?" border brd":"")}
+  if(fw)fw.textContent=mUser.followers;
+ }catch(e){
+  mUser.is_following=was;mUser.followers=prevFw;
+  if(b){b.textContent=mUser.is_following?t("uf"):t("fl");b.className="bb text-white font-bold rounded-full px-5 py-2 text-sm"+(mUser.is_following?" border brd":"")}
+  if(fw)fw.textContent=mUser.followers;
+  alert(e.message)
+ }
+ tglFollowVP._busy=false
+}
 function toggleCertForm(){$("certFormBox").classList.toggle("hide")}
 var ctB64=null;
 function pickCertImg(inp){var f=inp.files[0];if(!f)return;
