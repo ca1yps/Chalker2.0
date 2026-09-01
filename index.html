@@ -47,6 +47,7 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;bac
  radial-gradient(ellipse 600px 500px at 50% 120%, rgba(0,186,124,.05), transparent 55%)}
 #authView,#appView{position:relative;z-index:1}
 .brd{border-color:var(--brd)}
+
 /* buttons */
 .bb{background:#fff;color:#000!important;position:relative;box-shadow:0 2px 10px -2px rgba(255,255,255,.2);will-change:transform}
 .bb:hover{filter:brightness(.92);box-shadow:0 4px 16px -2px rgba(255,255,255,.25);transform:translateY(-1px)}
@@ -643,7 +644,7 @@ function rPost(p){
  var m="";
  if(p.media_base64&&p.media_type==="video")m='<video src="'+p.media_base64+'" controls preload="none" class="mt-2.5 rounded-2xl border brd max-h-96 w-full"></video>';
  else if(p.media_base64)m='<img src="'+p.media_base64+'" loading="lazy" data-lb onclick="openLightbox(this.src)" class="mt-2.5 rounded-2xl border brd w-full max-h-96 object-contain bg-black/20">';
- var own=p.user_id===me.id?' <span class="text-[11px] text-gray-600"><span class="cursor-pointer hover:text-white" onclick="edPost('+p.id+')">'+t("ed")+'</span> · <span class="cursor-pointer hover:text-red-400" onclick="dlPost('+p.id+')">'+t("dl")+'</span></span>':"";
+ var own=p.user_id===me.id?' <span class="text-[11px] text-gray-600"><span class="cursor-pointer hover:text-white" onclick="edPost(\''+p.id+'\')">'+t("ed")+'</span> · <span class="cursor-pointer hover:text-red-400" onclick="dlPost(\''+p.id+'\')">'+t("dl")+'</span></span>':"";
  return '<div class="pc border-b brd px-3.5 py-3.5 sm:px-4 sm:py-4 anim"><div class="flex gap-2.5 sm:gap-3">'+
  '<img src="'+ava(p.avatar_base64)+'" onclick="openProfile(\''+p.username+'\')" class="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover cursor-pointer bg-neutral-800 shrink-0">'+
  '<div class="flex-1 min-w-0">'+
@@ -653,13 +654,13 @@ function rPost(p){
  '<span class="text-gray-600 text-[11px] sm:text-xs shrink-0">· '+relTime(p.timestamp)+'</span></div>'+own+'</div>'+
  '<p id="pt-'+p.id+'" class="mt-1.5 text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words">'+lm(esc(p.content))+'</p>'+m+
  '<div class="flex items-center gap-1 -ml-2 mt-2">'+
- '<button id="lk-'+p.id+'" onclick="react('+p.id+')" class="pAct'+(p.my_status===1?' on':'')+'">'+lkH(p)+'</button>'+
- '<button id="cmBtn-'+p.id+'" onclick="tglC('+p.id+')" class="pAct"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> '+p.comments_count+'</button>'+
- '<button onclick="sharePost('+p.id+')" class="pAct"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg> '+t("ul")+'</button></div>'+
+ '<button id="lk-'+p.id+'" onclick="react(\''+p.id+'\')" class="pAct'+(p.my_status===1?' on':'')+'">'+lkH(p)+'</button>'+
+ '<button id="cmBtn-'+p.id+'" onclick="tglC(\''+p.id+'\')" class="pAct"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> '+p.comments_count+'</button>'+
+ '<button onclick="sharePost(\''+p.id+'\')" class="pAct"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg> '+t("ul")+'</button></div>'+
  '<div id="cm-'+p.id+'" class="hide mt-3 border-t brd pt-3"><div id="cl-'+p.id+'" class="space-y-3 mb-3"></div>'+
  '<div id="rh-'+p.id+'" class="hide text-xs text-gray-300 mb-1"></div><div class="flex gap-2">'+
- '<input id="ci-'+p.id+'" placeholder="'+t("rp")+'" onkeydown="if(event.key===\'Enter\')sendCmt('+p.id+')" class="flex-1 bg-neutral-900 border brd rounded-full px-4 py-2 text-sm">'+
- '<button onclick="sendCmt('+p.id+')" class="bb text-white text-sm font-bold rounded-full px-4">'+t("snd")+'</button></div></div></div></div></div>'}
+ '<input id="ci-'+p.id+'" placeholder="'+t("rp")+'" onkeydown="if(event.key===\'Enter\')sendCmt(\''+p.id+'\')" class="flex-1 bg-neutral-900 border brd rounded-full px-4 py-2 text-sm">'+
+ '<button onclick="sendCmt(\''+p.id+'\')" class="bb text-white text-sm font-bold rounded-full px-4">'+t("snd")+'</button></div></div></div></div></div>'}
 function sharePost(id){var url=window.location.origin+"/?post="+id;
  if(navigator.share){navigator.share({title:"Chalker",url:url}).catch(function(){})}
  else if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){alert(t("shCopied"))})}
@@ -715,14 +716,14 @@ async function loadCmts(id){var box=$("cl-"+id);if(!box||box.dataset.busy==="1")
  box.innerHTML=loaderHTML(true);
  try{var l=await api("/comments?post_id="+id+"&viewer_id="+me.id);
  function one(c,r){var canDel=(c.username===me.username||me.username==="boss");
-  var delBtn=canDel?' · <span class="cursor-pointer text-gray-500 hover:text-red-400 font-semibold" onclick="delCmt('+id+','+c.id+')">'+t("dl")+'</span>':"";
+  var delBtn=canDel?' · <span class="cursor-pointer text-gray-500 hover:text-red-400 font-semibold" onclick="delCmt(\''+id+'\',\''+c.id+'\')">'+t("dl")+'</span>':"";
   return '<div class="'+(r?'ml-5 sm:ml-8 border-l-2 border-neutral-800 pl-2 sm:pl-3':'')+'"><div class="flex gap-2">'+
   '<img src="'+ava(c.avatar_base64)+'" class="w-7 h-7 rounded-full object-cover bg-neutral-800 cursor-pointer" onclick="openProfile(\''+c.username+'\')">'+
   '<div class="flex-1 min-w-0"><span class="font-bold text-sm cursor-pointer hover:underline" onclick="openProfile(\''+c.username+'\')">'+esc(c.fullname)+bdg(c.username,c.can_post_news)+'</span>'+
   ' <span class="text-gray-500 text-xs">@'+c.username+'</span><p class="text-sm break-words">'+lm(esc(c.content))+'</p>'+
   '<div class="flex items-center gap-2 mt-1">'+
-  '<button id="clk-'+c.id+'" onclick="cmtReact('+c.id+',false)" class="stk cstk stk-like'+(c.likes_count>0&&c.my_like?' on':'')+'">'+(c.my_like?HF:HO)+' '+(c.likes_count||0)+'</button>'+
-  '<button onclick="setRep('+id+','+c.id+',\''+c.username+'\')" class="text-xs text-gray-500 hover:text-white font-semibold">'+t("rpl")+'</button>'+delBtn+'</div></div></div></div>'}
+  '<button id="clk-'+c.id+'" onclick="cmtReact(\''+c.id+'\',false)" class="stk cstk stk-like'+(c.likes_count>0&&c.my_like?' on':'')+'">'+(c.my_like?HF:HO)+' '+(c.likes_count||0)+'</button>'+
+  '<button onclick="setRep(\''+id+'\',\''+c.id+'\',\''+c.username+'\')" class="text-xs text-gray-500 hover:text-white font-semibold">'+t("rpl")+'</button>'+delBtn+'</div></div></div></div>'}
  var byId={};l.forEach(function(c){byId[c.id]=c});
  function rootOf(c){var cur=c,guard=0;while(cur.parent_id&&byId[cur.parent_id]&&guard++<50){cur=byId[cur.parent_id]}return cur}
  var groups={},order=[];
@@ -818,18 +819,18 @@ async function loadNews(){try{
  var h="";
  ns.forEach(function(n){nCache[n.id]=n;
   var mine=(n.author===me.username)||(me.username==="boss");
-  var own=mine?' <span class="text-xs text-gray-500"><span class="cursor-pointer hover:text-white" onclick="edNews('+n.id+')">'+t("ed")+'</span> · <span class="cursor-pointer hover:text-red-400" onclick="dlNews('+n.id+')">'+t("dl")+'</span></span>':"";
+  var own=mine?' <span class="text-xs text-gray-500"><span class="cursor-pointer hover:text-white" onclick="edNews(\''+n.id+'\')">'+t("ed")+'</span> · <span class="cursor-pointer hover:text-red-400" onclick="dlNews(\''+n.id+'\')">'+t("dl")+'</span></span>':"";
   h+='<div class="pc border-b brd px-3.5 py-3.5 sm:px-4 sm:py-4 anim"><div class="flex items-center gap-1.5 sm:gap-2 flex-wrap text-[13px] sm:text-sm">'+
   '<span class="font-bold">\u{1F4E2} '+t("v2")+'</span>'+
   (n.author?'<span class="mention" onclick="openProfile(\''+n.author+'\')">@'+n.author+'</span>':'')+
   '<span class="text-gray-600 text-[11px] sm:text-xs">· '+relTime(n.timestamp)+'</span>'+own+'</div>'+
   '<p id="nt-'+n.id+'" class="mt-1.5 text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words">'+lm(esc(n.title))+'</p>'+
   '<div class="flex items-center gap-1 -ml-2 mt-2">'+
-  '<button id="nlk-'+n.id+'" onclick="nReact('+n.id+')" class="pAct'+(n.my_like?' on':'')+'">'+nlkH(n)+'</button>'+
-  '<button id="ncmBtn-'+n.id+'" onclick="tglNC('+n.id+')" class="pAct"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> '+n.comments_count+'</button></div>'+
+  '<button id="nlk-'+n.id+'" onclick="nReact(\''+n.id+'\')" class="pAct'+(n.my_like?' on':'')+'">'+nlkH(n)+'</button>'+
+  '<button id="ncmBtn-'+n.id+'" onclick="tglNC(\''+n.id+'\')" class="pAct"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> '+n.comments_count+'</button></div>'+
   '<div id="ncm-'+n.id+'" class="hide mt-3 border-t brd pt-3"><div id="ncl-'+n.id+'" class="space-y-3 mb-3"></div><div class="flex gap-2">'+
-  '<input id="nci-'+n.id+'" placeholder="'+t("rp")+'" onkeydown="if(event.key===\'Enter\')sendNCmt('+n.id+')" class="flex-1 bg-neutral-900 border brd rounded-full px-4 py-2 text-sm">'+
-  '<button onclick="sendNCmt('+n.id+')" class="bb text-white text-sm font-bold rounded-full px-4">'+t("snd")+'</button></div></div></div>'});
+  '<input id="nci-'+n.id+'" placeholder="'+t("rp")+'" onkeydown="if(event.key===\'Enter\')sendNCmt(\''+n.id+'\')" class="flex-1 bg-neutral-900 border brd rounded-full px-4 py-2 text-sm">'+
+  '<button onclick="sendNCmt(\''+n.id+'\')" class="bb text-white text-sm font-bold rounded-full px-4">'+t("snd")+'</button></div></div></div>'});
  $("newsList").innerHTML=h;
  ns.forEach(function(n){if(oNC[n.id]){sh("ncm-"+n.id);loadNCmts(n.id)}})
 }catch(e){alert(e.message)}}
@@ -853,11 +854,11 @@ async function loadNCmts(id){var box=$("ncl-"+id);if(!box||box.dataset.busy==="1
  box.innerHTML=loaderHTML(true);
  try{var l=await api("/news/comments?news_id="+id+"&viewer_id="+me.id);var h="";
  l.forEach(function(c){var canDel=(c.username===me.username||me.username==="boss");
-  var delBtn=canDel?' <span class="cursor-pointer text-gray-500 hover:text-red-400 font-semibold" onclick="delNCmt('+id+','+c.id+')">'+t("dl")+'</span>':"";
+  var delBtn=canDel?' <span class="cursor-pointer text-gray-500 hover:text-red-400 font-semibold" onclick="delNCmt(\''+id+'\',\''+c.id+'\')">'+t("dl")+'</span>':"";
   h+='<div class="flex gap-2"><img src="'+ava(c.avatar_base64)+'" class="w-7 h-7 rounded-full object-cover bg-neutral-800 cursor-pointer" onclick="openProfile(\''+c.username+'\')">'+
   '<div class="flex-1 min-w-0"><span class="font-bold text-sm cursor-pointer hover:underline" onclick="openProfile(\''+c.username+'\')">'+esc(c.fullname)+bdg(c.username,c.can_post_news)+'</span>'+
   ' <span class="text-gray-500 text-xs">@'+c.username+'</span><p class="text-sm break-words">'+lm(esc(c.content))+'</p>'+
-  '<div class="flex items-center gap-2 mt-1"><button id="nclk-'+c.id+'" onclick="cmtReact('+c.id+',true)" class="stk cstk stk-like'+(c.my_like?' on':'')+'">'+(c.my_like?HF:HO)+' '+(c.likes_count||0)+'</button>'+delBtn+'</div></div></div>'});
+  '<div class="flex items-center gap-2 mt-1"><button id="nclk-'+c.id+'" onclick="cmtReact(\''+c.id+'\',true)" class="stk cstk stk-like'+(c.my_like?' on':'')+'">'+(c.my_like?HF:HO)+' '+(c.likes_count||0)+'</button>'+delBtn+'</div></div></div>'});
  box.innerHTML=h||'<p class="text-gray-600 text-xs">'+t("fc")+'</p>'}
  catch(e){box.innerHTML='<p class="text-red-400 text-xs cursor-pointer" onclick="loadNCmts('+id+')">'+(e.message||"Xato")+' · \u21bb</p>'}
  finally{box.dataset.busy="0"}}
@@ -1074,8 +1075,8 @@ async function loadTrophy(u,isSelf){try{
  if(!certs.length){$("trophyGrid").innerHTML="";sh("noTrMsg");$("noTrMsg").textContent=t("noTr");return}
  hd("noTrMsg");var h="";
  certs.forEach(function(c){certCache[c.id]=c;
-  var delX=isSelf?'<div class="tdel" onclick="event.stopPropagation();delOwnCert('+c.id+')">\u2715</div>':"";
-  h+='<div class="trophyCard" onclick="openCert('+c.id+','+(isSelf?"true":"false")+')">'+delX+
+  var delX=isSelf?'<div class="tdel" onclick="event.stopPropagation();delOwnCert(\''+c.id+'\')">\u2715</div>':"";
+  h+='<div class="trophyCard" onclick="openCert(\''+c.id+'\','+(isSelf?"true":"false")+')">'+delX+
   (c.image_base64?'<img src="'+c.image_base64+'">':'<div class="w-full h-[68%] flex items-center justify-center text-3xl">\u{1F3C6}</div>')+
   '<svg class="tvb" viewBox="0 0 24 24" fill="#ffffff"><path d="M22.25 12c0-1.43-.88-2.67-2.19-3.34.46-1.39.2-2.9-.81-3.91s-2.52-1.27-3.91-.81c-.66-1.31-1.91-2.19-3.34-2.19s-2.67.88-3.33 2.19c-1.4-.46-2.91-.2-3.92.81s-1.26 2.52-.8 3.91c-1.31.67-2.2 1.91-2.2 3.34s.89 2.67 2.2 3.34c-.46 1.39-.21 2.9.8 3.91s2.52 1.26 3.91.81c.67 1.31 1.91 2.19 3.34 2.19s2.68-.88 3.34-2.19c1.39.45 2.9.2 3.91-.81s1.27-2.52.81-3.91c1.31-.67 2.19-1.91 2.19-3.34zm-11.71 4.2L6.8 12.46l1.41-1.42 2.26 2.26 4.8-5.23 1.47 1.36-6.2 6.77z"/></svg>'+
   '<div class="tcap">'+esc(c.title)+'</div></div>'});
