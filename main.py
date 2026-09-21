@@ -32,7 +32,10 @@ from pydantic import BaseModel
 #   Linux/Render: ~/.postgresql/root.crt
 # If that file isn't present, every connection attempt fails with an SSL
 # verification error, not a credentials error.
-DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Render'da "DATABASE_URL" muhit o'zgaruvchisi avtomatik olinadi,
+# Local testda esa zaxiradagi CockroachDB manzili ishlatiladi.
+DATABASE_URL = os.getenv("DATABASE_URL") or "postgresql://ilyosbek:CAIsL_qC1EfkDeRKwyN98Q@chalkerdb-19950.jxf.gcp-europe-west3.cockroachlabs.cloud:26257/defaultdb?sslmode=require"
 if not DATABASE_URL:
     raise RuntimeError(
         "DATABASE_URL environment variable topilmadi. "
@@ -337,6 +340,14 @@ def init():
           "timestamp" VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'UTC' + INTERVAL '5 hours', 'YYYY-MM-DD HH24:MI:SS')
         )""",
         """ALTER TABLE users ADD COLUMN IF NOT EXISTS university VARCHAR(255)""",
+        """ALTER TABLE posts ADD COLUMN IF NOT EXISTS quoted_post_id INT""",
+        """CREATE TABLE IF NOT EXISTS bookmarks(
+          id SERIAL PRIMARY KEY,
+          user_id INT NOT NULL,
+          post_id INT NOT NULL,
+          "timestamp" VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'UTC' + INTERVAL '5 hours', 'YYYY-MM-DD HH24:MI:SS')
+        )""",
+        """CREATE UNIQUE INDEX IF NOT EXISTS iubm ON bookmarks(user_id, post_id)""",
     ]
     # Each statement runs on its own so one failure (e.g. a stale/partial
     # previous deploy, or a table the migration already created slightly
@@ -415,7 +426,7 @@ def valid_username(u):
     return bool(_USERNAME_RE.match(u or ""))
 
 class PostCreate(BaseModel):
-    user_id: int; content: str = ""; media_base64: Optional[str] = None; media_type: Optional[str] = None
+    user_id: int; content: str = ""; media_base64: Optional[str] = None; media_type: Optional[str] = None; quoted_post_id: Optional[int] = None
 class PostEdit(BaseModel):
     user_id: int; post_id: int; content: str = ""
 class PostDel(BaseModel):
@@ -458,6 +469,8 @@ class CertSelfCreate(BaseModel):
     user_id: int; title: str; image_base64: Optional[str] = None
 class CertSelfDel(BaseModel):
     user_id: int; cert_id: int
+class BookmarkReq(BaseModel):
+    user_id: int; post_id: int
 
 @app.get("/ping")
 def ping():
@@ -669,10 +682,10 @@ async def upload_image(file: UploadFile = File(...)):
 
 @app.post("/api/posts/create")
 def post_create(b: PostCreate):
-    if not b.content.strip() and not b.media_base64: return err("Post bo'sh!")
+    if not b.content.strip() and not b.media_base64 and not b.quoted_post_id: return err("Post bo'sh!")
     c = db()
-    c.execute("INSERT INTO posts(user_id,content,media_base64,media_type) VALUES(%s,%s,%s,%s)",
-              (b.user_id, b.content.strip(), b.media_base64, b.media_type))
+    c.execute("INSERT INTO posts(user_id,content,media_base64,media_type,quoted_post_id) VALUES(%s,%s,%s,%s,%s)",
+              (b.user_id, b.content.strip(), b.media_base64, b.media_type, b.quoted_post_id))
     c.commit(); c.close(); return {"success": True}
 
 @app.post("/api/posts/update")
@@ -691,19 +704,33 @@ def post_delete(b: PostDel):
     c.execute("DELETE FROM posts WHERE id=%s", (b.post_id,))
     c.execute("DELETE FROM likes WHERE post_id=%s", (b.post_id,))
     c.execute("DELETE FROM comments WHERE post_id=%s", (b.post_id,))
+    c.execute("DELETE FROM bookmarks WHERE post_id=%s", (b.post_id,))
     c.commit(); c.close(); return {"success": True}
+
+# Shared SELECT used by /api/posts, /api/posts/saved and /api/posts/liked --
+# keeps like/comment/bookmark counts and the (optional) quoted-post preview
+# consistent across all three listings instead of duplicating the join.
+_POSTS_SELECT = """SELECT p.id,p.user_id,p.content,p.media_base64,p.media_type,p."timestamp",p.quoted_post_id,
+        u.username,u.fullname,u.avatar_base64,u.can_post_news,
+        (SELECT COUNT(*) FROM likes l WHERE l.post_id=p.id AND l.is_like=1) likes_count,
+        (SELECT COUNT(*) FROM comments cm WHERE cm.post_id=p.id) comments_count,
+        (SELECT COUNT(*) FROM bookmarks bmc WHERE bmc.post_id=p.id) bookmarks_count,
+        (SELECT COUNT(*) FROM posts qc WHERE qc.quoted_post_id=p.id) reposts_count,
+        (SELECT l.is_like FROM likes l WHERE l.post_id=p.id AND l.user_id=%s) my_status,
+        (SELECT 1 FROM bookmarks bm WHERE bm.post_id=p.id AND bm.user_id=%s) my_bookmark,
+        qp.content quoted_content, qp.media_base64 quoted_media_base64, qp.media_type quoted_media_type,
+        qp."timestamp" quoted_timestamp, qu.username quoted_username, qu.fullname quoted_fullname,
+        qu.avatar_base64 quoted_avatar_base64
+        FROM posts p JOIN users u ON u.id=p.user_id
+        LEFT JOIN posts qp ON qp.id=p.quoted_post_id
+        LEFT JOIN users qu ON qu.id=qp.user_id"""
 
 @app.get("/api/posts")
 def posts(user_id: Optional[int] = None, author: Optional[str] = None):
     v = user_id if user_id is not None else -1
     c = db()
-    sql = """SELECT p.id,p.user_id,p.content,p.media_base64,p.media_type,p."timestamp",
-        u.username,u.fullname,u.avatar_base64,u.can_post_news,
-        (SELECT COUNT(*) FROM likes l WHERE l.post_id=p.id AND l.is_like=1) likes_count,
-        (SELECT COUNT(*) FROM comments cm WHERE cm.post_id=p.id) comments_count,
-        (SELECT l.is_like FROM likes l WHERE l.post_id=p.id AND l.user_id=%s) my_status
-        FROM posts p JOIN users u ON u.id=p.user_id"""
-    params = [v]
+    sql = _POSTS_SELECT
+    params = [v, v]
     if author:
         sql += " WHERE u.username=%s"
         params.append(clean_u(author))
@@ -715,6 +742,33 @@ def posts(user_id: Optional[int] = None, author: Optional[str] = None):
     # o'zi keshlab, keyingi safar layk bosilgan-bosilmaganini eski
     # holatda ko'rsatib qo'ymasin.
     return BigIntSafeJSONResponse([dict(r) for r in rows], headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
+
+@app.get("/api/posts/saved")
+def posts_saved(user_id: int):
+    """Posts the user has bookmarked, most recently saved first."""
+    c = db()
+    sql = _POSTS_SELECT + " JOIN bookmarks bm2 ON bm2.post_id=p.id AND bm2.user_id=%s ORDER BY bm2.id DESC"
+    rows = c.execute(sql, (user_id, user_id, user_id)).fetchall()
+    c.close()
+    return BigIntSafeJSONResponse([dict(r) for r in rows], headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
+
+@app.get("/api/posts/liked")
+def posts_liked(user_id: int):
+    """Posts the user has liked, most recently liked first."""
+    c = db()
+    sql = _POSTS_SELECT + " JOIN likes lk2 ON lk2.post_id=p.id AND lk2.user_id=%s AND lk2.is_like=1 ORDER BY lk2.id DESC"
+    rows = c.execute(sql, (user_id, user_id, user_id)).fetchall()
+    c.close()
+    return BigIntSafeJSONResponse([dict(r) for r in rows], headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
+
+@app.post("/api/posts/bookmark")
+def post_bookmark(b: BookmarkReq):
+    c = db()
+    if c.execute("SELECT 1 FROM bookmarks WHERE user_id=%s AND post_id=%s", (b.user_id, b.post_id)).fetchone():
+        c.execute("DELETE FROM bookmarks WHERE user_id=%s AND post_id=%s", (b.user_id, b.post_id)); bk = False
+    else:
+        c.execute("INSERT INTO bookmarks(user_id,post_id) VALUES(%s,%s)", (b.user_id, b.post_id)); bk = True
+    c.commit(); c.close(); return {"bookmarked": bk}
 
 @app.post("/api/posts/like")
 def post_like(b: LikeReq):
@@ -780,8 +834,8 @@ def search(q: str = "", viewer_id: Optional[int] = None):
     v = viewer_id if viewer_id is not None else -1
     rows = c.execute("""SELECT id,username,fullname,avatar_base64,can_post_news,school_name,
         (SELECT 1 FROM follows WHERE follower_id=%s AND following_id=users.id) is_following
-        FROM users WHERE username LIKE %s OR fullname LIKE %s
-        ORDER BY CASE WHEN username LIKE %s THEN 0 ELSE 1 END, username ASC
+        FROM users WHERE username ILIKE %s OR fullname ILIKE %s
+        ORDER BY CASE WHEN username ILIKE %s THEN 0 ELSE 1 END, username ASC
         LIMIT 25""",
         (v, like, like, q + "%")).fetchall()
     c.close()
@@ -937,6 +991,7 @@ def admin_delete_user(b: DeleteUserReq):
         c.execute("DELETE FROM comments WHERE user_id=%s", (uid,))
         c.execute("DELETE FROM likes WHERE user_id=%s", (uid,))
         c.execute("DELETE FROM comment_likes WHERE user_id=%s", (uid,))
+        c.execute("DELETE FROM bookmarks WHERE user_id=%s", (uid,))
         nc_ids = [r["id"] for r in c.execute("SELECT id FROM news_comments WHERE user_id=%s", (uid,)).fetchall()]
         for ncid in nc_ids:
             c.execute("DELETE FROM news_comment_likes WHERE comment_id=%s", (ncid,))
