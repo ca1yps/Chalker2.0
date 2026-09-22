@@ -4,7 +4,7 @@ import threading
 import time
 import uuid
 import json
-from typing import Optional
+from typing import Optional, List
 
 import boto3
 from botocore.client import Config as _BotoConfig
@@ -348,6 +348,21 @@ def init():
           "timestamp" VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'UTC' + INTERVAL '5 hours', 'YYYY-MM-DD HH24:MI:SS')
         )""",
         """CREATE UNIQUE INDEX IF NOT EXISTS iubm ON bookmarks(user_id, post_id)""",
+        """ALTER TABLE posts ADD COLUMN IF NOT EXISTS poll_ends_at VARCHAR(50)""",
+        """CREATE TABLE IF NOT EXISTS poll_options(
+          id SERIAL PRIMARY KEY,
+          post_id INT NOT NULL,
+          option_text TEXT NOT NULL,
+          option_order INT DEFAULT 0
+        )""",
+        """CREATE TABLE IF NOT EXISTS poll_votes(
+          id SERIAL PRIMARY KEY,
+          post_id INT NOT NULL,
+          option_id INT NOT NULL,
+          user_id INT NOT NULL,
+          "timestamp" VARCHAR(50) DEFAULT to_char(now() AT TIME ZONE 'UTC' + INTERVAL '5 hours', 'YYYY-MM-DD HH24:MI:SS')
+        )""",
+        """CREATE UNIQUE INDEX IF NOT EXISTS iupv ON poll_votes(post_id, user_id)""",
     ]
     # Each statement runs on its own so one failure (e.g. a stale/partial
     # previous deploy, or a table the migration already created slightly
@@ -427,6 +442,9 @@ def valid_username(u):
 
 class PostCreate(BaseModel):
     user_id: int; content: str = ""; media_base64: Optional[str] = None; media_type: Optional[str] = None; quoted_post_id: Optional[int] = None
+    poll_options: Optional[List[str]] = None; poll_minutes: Optional[int] = None
+class PollVote(BaseModel):
+    user_id: int; post_id: int; option_id: int
 class PostEdit(BaseModel):
     user_id: int; post_id: int; content: str = ""
 class PostDel(BaseModel):
@@ -682,11 +700,50 @@ async def upload_image(file: UploadFile = File(...)):
 
 @app.post("/api/posts/create")
 def post_create(b: PostCreate):
-    if not b.content.strip() and not b.media_base64 and not b.quoted_post_id: return err("Post bo'sh!")
+    opts = [o.strip() for o in (b.poll_options or []) if o and o.strip()][:4]
+    has_poll = len(opts) >= 2
+    if not b.content.strip() and not b.media_base64 and not b.quoted_post_id and not has_poll:
+        return err("Post bo'sh!")
     c = db()
-    c.execute("INSERT INTO posts(user_id,content,media_base64,media_type,quoted_post_id) VALUES(%s,%s,%s,%s,%s)",
-              (b.user_id, b.content.strip(), b.media_base64, b.media_type, b.quoted_post_id))
-    c.commit(); c.close(); return {"success": True}
+    mins = b.poll_minutes if (has_poll and b.poll_minutes and b.poll_minutes > 0) else None
+    if has_poll and not mins:
+        mins = 24 * 60  # default: 1 kunlik so'rovnoma
+    row = c.execute(
+        """INSERT INTO posts(user_id,content,media_base64,media_type,quoted_post_id,poll_ends_at)
+           VALUES(%s,%s,%s,%s,%s,
+             CASE WHEN %s THEN to_char(now() AT TIME ZONE 'UTC' + INTERVAL '5 hours' + (%s::text || ' minutes')::interval,'YYYY-MM-DD HH24:MI:SS') ELSE NULL END)
+           RETURNING id""",
+        (b.user_id, b.content.strip(), b.media_base64, b.media_type, b.quoted_post_id, has_poll, mins),
+    ).fetchone()
+    pid = row["id"]
+    if has_poll:
+        for i, opt in enumerate(opts):
+            c.execute("INSERT INTO poll_options(post_id,option_text,option_order) VALUES(%s,%s,%s)", (pid, opt[:100], i))
+    c.commit(); c.close(); return {"success": True, "post_id": pid}
+
+@app.post("/api/polls/vote")
+def poll_vote(b: PollVote):
+    c = db()
+    post = c.execute(
+        """SELECT poll_ends_at, (poll_ends_at IS NOT NULL AND poll_ends_at::timestamp < (now() AT TIME ZONE 'UTC' + INTERVAL '5 hours')) AS expired
+           FROM posts WHERE id=%s""", (b.post_id,)).fetchone()
+    if not post or not post["poll_ends_at"]:
+        c.close(); return err("So'rovnoma topilmadi!", 404)
+    if post["expired"]:
+        c.close(); return err("So'rovnoma muddati tugagan!", 400)
+    opt = c.execute("SELECT id FROM poll_options WHERE id=%s AND post_id=%s", (b.option_id, b.post_id)).fetchone()
+    if not opt:
+        c.close(); return err("Noto'g'ri tanlov!", 404)
+    c.execute(
+        """INSERT INTO poll_votes(post_id,option_id,user_id) VALUES(%s,%s,%s)
+           ON CONFLICT (post_id,user_id) DO UPDATE SET option_id=EXCLUDED.option_id""",
+        (b.post_id, b.option_id, b.user_id))
+    c.commit()
+    opts = c.execute(
+        """SELECT po.id,(SELECT COUNT(*) FROM poll_votes pv WHERE pv.option_id=po.id) votes_count
+           FROM poll_options po WHERE po.post_id=%s ORDER BY po.option_order""", (b.post_id,)).fetchall()
+    c.close()
+    return {"success": True, "options": [dict(o) for o in opts], "my_option_id": b.option_id}
 
 @app.post("/api/posts/update")
 def post_update(b: PostEdit):
@@ -705,12 +762,14 @@ def post_delete(b: PostDel):
     c.execute("DELETE FROM likes WHERE post_id=%s", (b.post_id,))
     c.execute("DELETE FROM comments WHERE post_id=%s", (b.post_id,))
     c.execute("DELETE FROM bookmarks WHERE post_id=%s", (b.post_id,))
+    c.execute("DELETE FROM poll_votes WHERE post_id=%s", (b.post_id,))
+    c.execute("DELETE FROM poll_options WHERE post_id=%s", (b.post_id,))
     c.commit(); c.close(); return {"success": True}
 
 # Shared SELECT used by /api/posts, /api/posts/saved and /api/posts/liked --
 # keeps like/comment/bookmark counts and the (optional) quoted-post preview
 # consistent across all three listings instead of duplicating the join.
-_POSTS_SELECT = """SELECT p.id,p.user_id,p.content,p.media_base64,p.media_type,p."timestamp",p.quoted_post_id,
+_POSTS_SELECT = """SELECT p.id,p.user_id,p.content,p.media_base64,p.media_type,p."timestamp",p.quoted_post_id,p.poll_ends_at,
         u.username,u.fullname,u.avatar_base64,u.can_post_news,
         (SELECT COUNT(*) FROM likes l WHERE l.post_id=p.id AND l.is_like=1) likes_count,
         (SELECT COUNT(*) FROM comments cm WHERE cm.post_id=p.id) comments_count,
@@ -725,6 +784,37 @@ _POSTS_SELECT = """SELECT p.id,p.user_id,p.content,p.media_base64,p.media_type,p
         LEFT JOIN posts qp ON qp.id=p.quoted_post_id
         LEFT JOIN users qu ON qu.id=qp.user_id"""
 
+def _attach_polls(c, rows, viewer_id):
+    """Mutates each row dict in place, adding a "poll" key (or None) with
+    its options, vote counts and the viewer's own vote -- kept as a
+    separate follow-up query since building an options-as-array directly
+    in the main JOIN would be awkward in plain psycopg2."""
+    ids = [r["id"] for r in rows if r.get("poll_ends_at")]
+    if not ids:
+        for r in rows:
+            r["poll"] = None
+        return rows
+    opts = c.execute(
+        """SELECT po.id,po.post_id,po.option_text,po.option_order,
+           (SELECT COUNT(*) FROM poll_votes pv WHERE pv.option_id=po.id) votes_count
+           FROM poll_options po WHERE po.post_id = ANY(%s) ORDER BY po.post_id, po.option_order""",
+        (ids,)).fetchall()
+    my_votes = c.execute(
+        "SELECT post_id, option_id FROM poll_votes WHERE user_id=%s AND post_id = ANY(%s)",
+        (viewer_id, ids)).fetchall()
+    my_map = {r["post_id"]: r["option_id"] for r in my_votes}
+    by_post = {}
+    for o in opts:
+        by_post.setdefault(o["post_id"], []).append(dict(o))
+    for r in rows:
+        if r.get("poll_ends_at"):
+            options = by_post.get(r["id"], [])
+            total = sum(o["votes_count"] for o in options)
+            r["poll"] = {"ends_at": r["poll_ends_at"], "options": options, "total_votes": total, "my_vote": my_map.get(r["id"])}
+        else:
+            r["poll"] = None
+    return rows
+
 @app.get("/api/posts")
 def posts(user_id: Optional[int] = None, author: Optional[str] = None):
     v = user_id if user_id is not None else -1
@@ -735,31 +825,34 @@ def posts(user_id: Optional[int] = None, author: Optional[str] = None):
         sql += " WHERE u.username=%s"
         params.append(clean_u(author))
     sql += " ORDER BY p.id DESC"
-    rows = c.execute(sql, tuple(params)).fetchall()
+    rows = [dict(r) for r in c.execute(sql, tuple(params)).fetchall()]
+    _attach_polls(c, rows, v)
     c.close()
     # no-store: har doim like/comment holati bo'yicha eng so'nggi
     # ma'lumot qaytsin -- brauzer/Telegram WebView bu GET javobini
     # o'zi keshlab, keyingi safar layk bosilgan-bosilmaganini eski
     # holatda ko'rsatib qo'ymasin.
-    return BigIntSafeJSONResponse([dict(r) for r in rows], headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
+    return BigIntSafeJSONResponse(rows, headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
 
 @app.get("/api/posts/saved")
 def posts_saved(user_id: int):
     """Posts the user has bookmarked, most recently saved first."""
     c = db()
     sql = _POSTS_SELECT + " JOIN bookmarks bm2 ON bm2.post_id=p.id AND bm2.user_id=%s ORDER BY bm2.id DESC"
-    rows = c.execute(sql, (user_id, user_id, user_id)).fetchall()
+    rows = [dict(r) for r in c.execute(sql, (user_id, user_id, user_id)).fetchall()]
+    _attach_polls(c, rows, user_id)
     c.close()
-    return BigIntSafeJSONResponse([dict(r) for r in rows], headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
+    return BigIntSafeJSONResponse(rows, headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
 
 @app.get("/api/posts/liked")
 def posts_liked(user_id: int):
     """Posts the user has liked, most recently liked first."""
     c = db()
     sql = _POSTS_SELECT + " JOIN likes lk2 ON lk2.post_id=p.id AND lk2.user_id=%s AND lk2.is_like=1 ORDER BY lk2.id DESC"
-    rows = c.execute(sql, (user_id, user_id, user_id)).fetchall()
+    rows = [dict(r) for r in c.execute(sql, (user_id, user_id, user_id)).fetchall()]
+    _attach_polls(c, rows, user_id)
     c.close()
-    return BigIntSafeJSONResponse([dict(r) for r in rows], headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
+    return BigIntSafeJSONResponse(rows, headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
 
 @app.post("/api/posts/bookmark")
 def post_bookmark(b: BookmarkReq):
