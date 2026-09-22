@@ -264,6 +264,93 @@ button,[onclick],.pAct,.stk,.mention{touch-action:manipulation;-webkit-tap-highl
 
 /* ---------- profile header ---------- */
 .pcover{height:80px;background:linear-gradient(120deg,#0d2b3f,#08131c 60%,#1a0d1e)}
+
+/* ---------- custom centered dialog (replaces native alert/confirm) ---------- */
+@keyframes dlgIn{0%{opacity:0;transform:scale(.9) translateY(8px)}100%{opacity:1;transform:none}}
+#dlgOverlay{position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+ z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}
+#dlgOverlay .dlgBox{width:100%;max-width:340px;background:linear-gradient(180deg,#141518,#0a0b0d);border:1px solid var(--brd-soft);
+ border-radius:20px;box-shadow:0 24px 60px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.06);padding:22px 20px 18px;
+ text-align:center;animation:dlgIn .22s cubic-bezier(.2,.8,.3,1) both}
+#dlgOverlay .dlgIcon{width:42px;height:42px;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center}
+#dlgOverlay .dlgIcon.warn{background:rgba(244,33,46,.14);color:#f4212e}
+#dlgOverlay .dlgIcon.info{background:rgba(255,255,255,.10);color:#fff}
+#dlgOverlay .dlgMsg{font-size:14.5px;line-height:1.5;color:var(--txt);white-space:pre-wrap;word-break:break-word}
+#dlgOverlay .dlgBtns{display:flex;gap:10px;margin-top:18px}
+#dlgOverlay .dlgBtn{flex:1;border-radius:999px;padding:10px 0;font-weight:800;font-size:13.5px;border:1px solid var(--brd);
+ background:var(--surface-2);color:var(--txt);transition:filter .15s ease,transform .15s ease}
+#dlgOverlay .dlgBtn:active{transform:scale(.96)}
+#dlgOverlay .dlgBtn.dlgOk{background:#fff;color:#000;border-color:transparent}
+#dlgOverlay .dlgBtn.dlgDanger{background:#f4212e;color:#fff;border-color:transparent}
+
+/* ---------- top-sliding toast notifications ---------- */
+#toastStack{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);left:0;right:0;z-index:210;
+ display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;padding:0 12px}
+.toastItem{pointer-events:auto;max-width:420px;width:100%;display:flex;align-items:center;gap:10px;
+ background:rgba(20,21,24,.96);border:1px solid var(--brd-soft);border-radius:14px;padding:11px 14px;
+ box-shadow:0 10px 30px rgba(0,0,0,.55);font-size:13.5px;font-weight:700;color:var(--txt);
+ transform:translateY(-140%);opacity:0;transition:transform .35s cubic-bezier(.2,.8,.3,1),opacity .35s ease}
+.toastItem.show{transform:translateY(0);opacity:1}
+.toastItem .tIco{flex:none;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.toastItem.ok .tIco{background:rgba(0,186,124,.18);color:var(--green)}
+.toastItem.err .tIco{background:rgba(244,33,46,.18);color:#f4212e}
+
+/* ---------- composer icon toolbar (image / poll) ---------- */
+.composerIcons{display:flex;align-items:center;gap:2px}
+.cIcoBtn{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;
+ color:var(--sky);background:none;border:none;transition:background-color .15s ease,transform .15s ease}
+.cIcoBtn:hover{background:rgba(255,255,255,.10)}
+.cIcoBtn:active{transform:scale(.9)}
+.cIcoBtn svg{width:19px;height:19px}
+.cIcoBtn.active{color:#fff;background:rgba(255,255,255,.14)}
+
+/* ---------- poll builder (inside composer / quote box) ---------- */
+.pollBuilder{margin-top:10px;border:1px solid var(--brd);border-radius:14px;padding:12px;background:var(--surface)}
+.pollChoiceRow{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.pollChoiceRow input{flex:1}
+.pollRmChoice{flex:none;width:28px;height:28px;border-radius:999px;color:#8b9198;display:flex;align-items:center;justify-content:center;background:none;border:none}
+.pollRmChoice:hover{color:#f4212e;background:rgba(244,33,46,.12)}
+.pollAddBtn{font-size:12.5px;font-weight:700;color:var(--sky);padding:6px 2px;background:none;border:none}
+.pollAddBtn:hover{text-decoration:underline}
+.pollLenRow{display:flex;gap:8px;margin-top:10px}
+.pollLenRow select{flex:1;background:var(--surface-2);border:1px solid var(--brd);border-radius:10px;padding:.5rem;font-size:12.5px}
+.pollLenLbl{font-size:11px;color:var(--txt-dim);font-weight:700;margin-top:10px;margin-bottom:2px}
+.pollRemoveBtn{margin-top:10px;font-size:12px;font-weight:700;color:#f4212e;background:none;border:none}
+.pollRemoveBtn:hover{text-decoration:underline}
+
+/* ---------- poll display (inside a post) ---------- */
+.pollBox{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.pollOpt{position:relative;border:1px solid var(--brd);border-radius:10px;padding:9px 12px;cursor:pointer;overflow:hidden;
+ font-size:13.5px;font-weight:700;transition:border-color .15s ease}
+.pollOpt:hover{border-color:#536471}
+.pollOpt .pollFill{position:absolute;inset:0;background:rgba(255,255,255,.14);width:0%;transition:width .5s cubic-bezier(.2,.8,.3,1);z-index:0}
+.pollOpt.voted .pollFill{background:rgba(255,255,255,.18)}
+.pollOpt.mine{border-color:var(--sky)}
+.pollOpt .pollRow{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pollOpt .pollPct{color:var(--txt-dim);font-weight:800;flex:none}
+.pollMeta{font-size:12px;color:var(--txt-dim);font-weight:700}
+
+/* ---------- phone/tablet fixes: dialog, toast, poll builder must never
+   overflow or overlap other fixed UI (bottom tab bar, safe areas) ---------- */
+@media(max-width:640px){
+ #dlgOverlay .dlgBox{max-width:92vw;padding:20px 16px 16px}
+ #toastStack{top:calc(env(safe-area-inset-top,0px) + 8px);padding:0 8px}
+ .toastItem{max-width:100%;font-size:13px}
+ .pollLenRow{flex-wrap:wrap}
+ .pollLenRow select{min-width:30%;font-size:12px;padding:.45rem .3rem}
+ .pollChoiceRow input{min-width:0}
+ .cIcoBtn{width:34px;height:34px}
+ .cIcoBtn svg{width:18px;height:18px}
+}
+/* the bottom tab bar is fixed on phones/tablets -- keep toasts and dialogs
+   from ever rendering underneath it, and keep dialog buttons from
+   wrapping awkwardly on very narrow screens */
+@media(max-width:1023.98px){
+ #dlgOverlay{padding-bottom:calc(16px + 72px + env(safe-area-inset-bottom,0px))}
+}
+@media(max-width:360px){
+ #dlgOverlay .dlgBtns{flex-direction:column}
+}
 </style>
 </head>
 <body>
@@ -323,9 +410,17 @@ button,[onclick],.pAct,.stk,.mention{touch-action:manipulation;-webkit-tap-highl
       <video id="mVid" class="hide max-h-72 rounded-2xl border brd w-full" controls></video>
       <button onclick="clrMedia()" class="absolute top-2 right-2 bg-black/70 rounded-full w-8 h-8 font-bold">&#10005;</button>
      </div>
+     <div id="pollBoxWrap-main"></div>
      <div class="flex items-center justify-between mt-2 border-t brd pt-3">
-      <label class="cursor-pointer text-white rounded-full px-3 py-1.5 text-sm font-bold hover:bg-white/10">
-       <span id="tMd"></span><input id="mInp" type="file" accept="image/*" class="hide" onchange="pickMedia(this)"></label>
+      <div class="composerIcons">
+       <label id="mIcoBtn-main" class="cIcoBtn" title="">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.8"/><path d="M21 15l-5-5L5 21"/></svg>
+        <input id="mInp" type="file" accept="image/*" class="hide" onchange="pickMedia(this)">
+       </label>
+       <button type="button" id="pollIcoBtn-main" class="cIcoBtn" onclick="togglePollBuilder('main')" title="">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="10" width="4" height="10" rx="1"/><rect x="10" y="5" width="4" height="15" rx="1"/><rect x="17" y="13" width="4" height="7" rx="1"/></svg>
+       </button>
+      </div>
       <button id="chalkBtn" onclick="createPost()" class="bb font-bold rounded-full px-7 py-2">Chalk</button>
      </div>
     </div>
@@ -399,7 +494,7 @@ button,[onclick],.pAct,.stk,.mention{touch-action:manipulation;-webkit-tap-highl
      <div id="vpPosts"></div>
     </div>
     <div class="lg:hidden text-center text-[11px] text-white/70 leading-relaxed border-t brd pt-4 pb-2">
-    <p>CEO & Founder - <a href="https://t.me/ilyos6ee" target="_blank" style="text-decoration: underline;">Ilyosbek Siddiqjonov</a></p>
+     <p>CEO Founder - Ilyosbek Siddiqjonov</p>
      <p>Copyright &copy; 2026 Chalker</p>
     </div>
    </div>
@@ -481,6 +576,16 @@ button,[onclick],.pAct,.stk,.mention{touch-action:manipulation;-webkit-tap-highl
   <button onclick="hd('quoteModal')" class="absolute top-3 right-4 text-gray-500 text-xl">&#10005;</button>
   <h3 id="tQuote" class="text-lg font-extrabold mb-4"></h3>
   <textarea id="qTxt" rows="3" oninput="autoGrow(this)" class="inp resize-none overflow-hidden mb-3"></textarea>
+  <div id="qMBox" class="hide relative mb-3">
+   <img id="qMImg" class="hide max-h-60 w-full rounded-2xl border brd object-contain bg-black/20">
+   <button onclick="clrQMedia()" class="absolute top-2 right-2 bg-black/70 rounded-full w-8 h-8 font-bold">&#10005;</button>
+  </div>
+  <div class="flex items-center gap-1 mb-3">
+   <label id="mIcoBtn-quote" class="cIcoBtn" title="">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.8"/><path d="M21 15l-5-5L5 21"/></svg>
+    <input id="qMInp" type="file" accept="image/*" class="hide" onchange="pickQMedia(this)">
+   </label>
+  </div>
   <div id="qPreview" class="border brd rounded-2xl p-3"></div>
   <button id="qBtn" onclick="submitQuote()" class="bb text-white font-bold rounded-full px-7 py-2.5 mt-4 w-full">Chalk</button>
  </div>
@@ -512,6 +617,13 @@ button,[onclick],.pAct,.stk,.mention{touch-action:manipulation;-webkit-tap-highl
 <div id="lightbox" class="hide fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4" onclick="closeLightbox()">
  <img id="lbImg" class="rounded-xl">
 </div>
+
+<!-- CUSTOM CENTERED DIALOG (replaces native alert()/confirm()) -->
+<div id="dlgOverlay" class="hide"></div>
+
+<!-- TOP-SLIDING TOAST STACK (replaces native alert() for info/success messages) -->
+<div id="toastStack"></div>
+
 <script>
 "use strict";
 var API=window.location.origin+"/api";
@@ -525,9 +637,9 @@ window.onerror=function(m,s,l){console.error("JS xato:",m,s,l);return true};
 window.addEventListener("unhandledrejection",function(e){console.error("Promise xato:",e.reason)});
 
 var TR={
-uz:{slogan:"Maktab ijtimoiy tarmog'i",tag:"Fikrlaring bilan maktabni bo'yab tashla!",lg:"Kirish",rg:"Ro'yxatdan o'tish",na:"Akkount yo'qmi?",ha:"Akkount bormi?",un:"Username",pw:"Parol",fn:"To'liq ism",uT:"Band",uF:"Bo'sh",v1:"Chalking",v2:"Yangiliklar",v3:"Profil",v4:"Chat",v5:"Bildirishnoma",v6:"Til",v7:"CEO",out:"Chiqish",wh:"Nima gaplar?!",md:"Rasm",ef:"Postlar yo'q. Birinchi bo'l!",av:"Avatar",rl:"MAQOM",st:"O'quvchi",tc:"O'qituvchi",geo:"Hudud va maktab",ct:"DAVLAT",rgn:"VILOYAT",sc:"MAKTAB",kl:"SINF",c1:"Davlatni tanlang",c2:"Viloyatni tanlang",c4:"Maktabni tanlang",c5:"Sinfni tanlang",bd:"TUG'ILGAN KUN",hd:"Yashirish",ht:"YURAK",hA:"Hech kim yo'q",hC:"Murakkab",hL:"Band",hP:"Sirli",sv:"Saqlash",svd:"Saqlandi!",ac:"Akkount xavfsizligi",aU:"Yangi username",aC:"Joriy parol",aN:"Yangi parol",up:"Yangilash",chs:"Chatlar",nc:"+ Yangi",slc:"Suhbatni tanlang",mp:"Xabar yozing...",nch:"Suhbatlar yo'q",pu:"Username kiriting:",np:"Yangi e'lon...",pb:"E'lon qilish",nn:"Yangiliklar yo'q",bd2:"Yangilik huquqini berish/olish",gr:"Huquqni almashtirish",ed:"Tahrirlash",dl:"O'chirish",fl:"Follow",uf:"Unfollow",sm:"Xabar yozish",hdn:"Yashirin",rp:"Javob yozing...",snd:"Yuborish",fc:"Birinchi komment yoz",cn:"bekor",cd:"Rostdan o'chirasizmi?",ep:"Yangi matn:",rpl:"Javob",nnt:"Bildirishnomalar yo'q",l1:"yurakcha bosdi",l2:"komment yozdi",l3:"xabar yubordi",l4:"yangi e'lon",cN:"Ism",cT:"Lavozim",cB:"Bio",addCeo:"Yangi CEO qo'shish",today:"Bugun",yesterday:"Kecha",editedTag:"(tahrirlangan)",editingMsg:"Xabar tahrirlanmoqda...",vS:"Qidiruv",srchPh:"Foydalanuvchi qidirish...",nosr:"Hech kim topilmadi",noCard:"Karta hali kiritilmagan",supTitle:"Homiylik",supEdit:"Tahrirlash",ul:"Ulashish",shCopied:"Havola nusxalandi!",loading:"Yuklanmoqda",settings:"Sozlamalar",trophy:"Trophy Cabinet",noTr:"Sertifikatlar hali yo'q",univ:"Qaysi oliygohga topshiryapsiz?",univPh:"Masalan: TATU, INHA, Milliy universitet...",lang:"TIL",followers:"Obunachilar",following:"Obunalar",noFol:"Hozircha hech kim yo'q",myPosts:"Postlari",noMyPosts:"Postlar yo'q",verified:"Tasdiqlangan",addCert:"Sertifikat berish",certTitle:"Sertifikat nomi",certUser:"@username",certImg:"Rasm biriktirish",certAdd:"Berish",closeX:"Yopish",support:"Homiylik",bossCab:"Boss Cabinet",unErr:"Username kamida 5 belgidan iborat bo'lishi va faqat harf, raqam, \"_\" va \".\" belgilaridan tashkil topishi kerak!",delUsrT:"Foydalanuvchini o'chirish",delUsrB:"Butunlay o'chirish",delUsrPh:"@username",delUsrConf:"Diqqat! Bu foydalanuvchi va uning barcha postlari, kommentlari butunlay o'chiriladi. Rostdan ham davom etasizmi?",delUsrOk:"Foydalanuvchi o'chirildi!",rmFol:"Olib tashlash",rmFolConf:"Bu obunachini ro'yxatdan olib tashlaysizmi?",savedTab:"Saqlangan",likedTab:"Layk bosgan",noSaved:"Saqlangan postlar yo'q",noLiked:"Layk bosilgan postlar yo'q",dlImg:"Yuklab olish",quoteTitle:"Javob postini yoz",qPh:"Fikringizni yozing...",postDeleted:"Post o'chirilgan",emoji:"Emojilar"},
-en:{slogan:"School social network",tag:"Chalk up your school with your thoughts!",lg:"Log in",rg:"Sign up",na:"No account?",ha:"Have an account?",un:"Username",pw:"Password",fn:"Full name",uT:"Taken",uF:"Available",v1:"Chalking",v2:"News",v3:"Profile",v4:"Chat",v5:"Notifications",v6:"Language",v7:"CEO",out:"Log out",wh:"What's happening?!",md:"Image",ef:"No posts yet. Be first!",av:"Avatar",rl:"ROLE",st:"Student",tc:"Teacher",geo:"Region & school",ct:"COUNTRY",rgn:"REGION",sc:"SCHOOL",kl:"CLASS",c1:"Select country",c2:"Select region",c4:"Select school",c5:"Select class",bd:"BIRTHDAY",hd:"Hide",ht:"HEART",hA:"Single",hC:"Complicated",hL:"Taken",hP:"Mysterious",sv:"Save",svd:"Saved!",ac:"Account security",aU:"New username",aC:"Current password",aN:"New password",up:"Update",chs:"Chats",nc:"+ New",slc:"Select a chat",mp:"Type a message...",nch:"No chats",pu:"Enter username:",np:"New announcement...",pb:"Publish",nn:"No news",bd2:"Grant/revoke news rights",gr:"Toggle rights",ed:"Edit",dl:"Delete",fl:"Follow",uf:"Unfollow",sm:"Message",hdn:"Hidden",rp:"Write a reply...",snd:"Send",fc:"Be first to comment",cn:"cancel",cd:"Really delete?",ep:"New text:",rpl:"Reply",nnt:"No notifications",l1:"liked your post",l2:"commented",l3:"sent a message",l4:"new announcement",cN:"Name",cT:"Title",cB:"Bio",addCeo:"Add new CEO",today:"Today",yesterday:"Yesterday",editedTag:"(edited)",editingMsg:"Editing message...",vS:"Search",srchPh:"Search users...",nosr:"No users found",noCard:"Card not set yet",supTitle:"Support",supEdit:"Edit",ul:"Share",shCopied:"Link copied!",loading:"Loading",settings:"Settings",trophy:"Trophy Cabinet",noTr:"No certificates yet",univ:"Which university are you applying to?",univPh:"e.g. TATU, INHA, National University...",lang:"LANGUAGE",followers:"Followers",following:"Following",noFol:"No one here yet",myPosts:"Posts",noMyPosts:"No posts",verified:"Verified",addCert:"Grant certificate",certTitle:"Certificate title",certUser:"@username",certImg:"Attach image",certAdd:"Grant",closeX:"Close",support:"Support",bossCab:"Boss Cabinet",unErr:"Username must be at least 5 characters and contain only letters, numbers, \"_\" and \".\"!",delUsrT:"Delete user",delUsrB:"Delete permanently",delUsrPh:"@username",delUsrConf:"Warning! This user and all of their posts and comments will be permanently deleted. Are you sure you want to continue?",delUsrOk:"User deleted!",rmFol:"Remove",rmFolConf:"Remove this follower from your list?",savedTab:"Saved",likedTab:"Liked",noSaved:"No saved posts",noLiked:"No liked posts",dlImg:"Download",quoteTitle:"Write a quote post",qPh:"Add a comment...",postDeleted:"Post deleted",emoji:"Emoji"},
-ru:{slogan:"Школьная соцсеть",tag:"Раскрась школу своими мыслями!",lg:"Войти",rg:"Регистрация",na:"Нет аккаунта?",ha:"Есть аккаунт?",un:"Имя пользователя",pw:"Пароль",fn:"Полное имя",uT:"Занято",uF:"Свободно",v1:"Chalking",v2:"Новости",v3:"Профиль",v4:"Чат",v5:"Уведомления",v6:"Язык",v7:"CEO",out:"Выйти",wh:"Что нового?!",md:"Фото",ef:"Постов нет. Будьте первым!",av:"Аватар",rl:"СТАТУС",st:"Ученик",tc:"Учитель",geo:"Регион и школа",ct:"СТРАНА",rgn:"ОБЛАСТЬ",sc:"ШКОЛА",kl:"КЛАСС",c1:"Выберите страну",c2:"Выберите область",c4:"Выберите школу",c5:"Выберите класс",bd:"ДЕНЬ РОЖДЕНИЯ",hd:"Скрыть",ht:"СЕРДЦЕ",hA:"Никого нет",hC:"Всё сложно",hL:"Занят(а)",hP:"Загадочно",sv:"Сохранить",svd:"Сохранено!",ac:"Безопасность",aU:"Новый username",aC:"Текущий пароль",aN:"Новый пароль",up:"Обновить",chs:"Чаты",nc:"+ Новый",slc:"Выберите чат",mp:"Сообщение...",nch:"Чатов нет",pu:"Введите username:",np:"Новое объявление...",pb:"Опубликовать",nn:"Новостей нет",bd2:"Право на новости",gr:"Переключить право",ed:"Изменить",dl:"Удалить",fl:"Подписаться",uf:"Отписаться",sm:"Написать",hdn:"Скрыто",rp:"Ответ...",snd:"Отправить",cn:"отмена",fc:"Будьте первым",cd:"Точно удалить?",ep:"Новый текст:",rpl:"Ответить",nnt:"Уведомлений нет",l1:"понравился ваш пост",l2:"комментировал",l3:"отправил сообщение",l4:"новое объявление",cN:"Имя",cT:"Должность",cB:"Био",addCeo:"Добавить нового CEO",today:"Сегодня",yesterday:"Вчера",editedTag:"(изменено)",editingMsg:"Редактирование сообщения...",vS:"Поиск",srchPh:"Поиск пользователей...",nosr:"Никто не найден",noCard:"Карта ещё не указана",supTitle:"Поддержка",supEdit:"Изменить",ul:"Поделиться",shCopied:"Ссылка скопирована!",loading:"Загрузка",settings:"Настройки",trophy:"Трофеи",noTr:"Сертификатов пока нет",univ:"В какой университет вы поступаете?",univPh:"напр. TATU, INHA, Национальный университет...",lang:"ЯЗЫК",followers:"Подписчики",following:"Подписки",noFol:"Пока никого нет",myPosts:"Посты",noMyPosts:"Постов нет",verified:"Подтверждено",addCert:"Выдать сертификат",certTitle:"Название сертификата",certUser:"@username",certImg:"Прикрепить фото",certAdd:"Выдать",closeX:"Закрыть",support:"Поддержка",bossCab:"Boss Cabinet",unErr:"Имя пользователя должно содержать минимум 5 символов и состоять только из букв, цифр, \"_\" и \".\"!",delUsrT:"Удалить пользователя",delUsrB:"Удалить навсегда",delUsrPh:"@username",delUsrConf:"Внимание! Этот пользователь и все его посты, комментарии будут удалены навсегда. Точно продолжить?",delUsrOk:"Пользователь удалён!",rmFol:"Удалить",rmFolConf:"Удалить этого подписчика из списка?",savedTab:"Сохранённые",likedTab:"Понравившиеся",noSaved:"Сохранённых постов нет",noLiked:"Постов с лайком нет",dlImg:"Скачать",quoteTitle:"Написать пост с цитатой",qPh:"Добавьте комментарий...",postDeleted:"Пост удалён",emoji:"Эмодзи"}};
+uz:{slogan:"Maktab ijtimoiy tarmog'i",tag:"Fikrlaring bilan maktabni bo'yab tashla!",lg:"Kirish",rg:"Ro'yxatdan o'tish",na:"Akkount yo'qmi?",ha:"Akkount bormi?",un:"Username",pw:"Parol",fn:"To'liq ism",uT:"Band",uF:"Bo'sh",v1:"Chalking",v2:"Yangiliklar",v3:"Profil",v4:"Chat",v5:"Bildirishnoma",v6:"Til",v7:"CEO",out:"Chiqish",wh:"Nima gaplar?!",md:"Rasm",ef:"Postlar yo'q. Birinchi bo'l!",av:"Avatar",rl:"MAQOM",st:"O'quvchi",tc:"O'qituvchi",geo:"Hudud va maktab",ct:"DAVLAT",rgn:"VILOYAT",sc:"MAKTAB",kl:"SINF",c1:"Davlatni tanlang",c2:"Viloyatni tanlang",c4:"Maktabni tanlang",c5:"Sinfni tanlang",bd:"TUG'ILGAN KUN",hd:"Yashirish",ht:"YURAK",hA:"Hech kim yo'q",hC:"Murakkab",hL:"Band",hP:"Sirli",sv:"Saqlash",svd:"Saqlandi!",ac:"Akkount xavfsizligi",aU:"Yangi username",aC:"Joriy parol",aN:"Yangi parol",up:"Yangilash",chs:"Chatlar",nc:"+ Yangi",slc:"Suhbatni tanlang",mp:"Xabar yozing...",nch:"Suhbatlar yo'q",pu:"Username kiriting:",np:"Yangi e'lon...",pb:"E'lon qilish",nn:"Yangiliklar yo'q",bd2:"Yangilik huquqini berish/olish",gr:"Huquqni almashtirish",ed:"Tahrirlash",dl:"O'chirish",fl:"Follow",uf:"Unfollow",sm:"Xabar yozish",hdn:"Yashirin",rp:"Javob yozing...",snd:"Yuborish",fc:"Birinchi komment yoz",cn:"bekor",cd:"Rostdan o'chirasizmi?",ep:"Yangi matn:",rpl:"Javob",nnt:"Bildirishnomalar yo'q",l1:"yurakcha bosdi",l2:"komment yozdi",l3:"xabar yubordi",l4:"yangi e'lon",cN:"Ism",cT:"Lavozim",cB:"Bio",addCeo:"Yangi CEO qo'shish",today:"Bugun",yesterday:"Kecha",editedTag:"(tahrirlangan)",editingMsg:"Xabar tahrirlanmoqda...",vS:"Qidiruv",srchPh:"Foydalanuvchi qidirish...",nosr:"Hech kim topilmadi",noCard:"Karta hali kiritilmagan",supTitle:"Homiylik",supEdit:"Tahrirlash",ul:"Ulashish",shCopied:"Havola nusxalandi!",loading:"Yuklanmoqda",settings:"Sozlamalar",trophy:"Trophy Cabinet",noTr:"Sertifikatlar hali yo'q",univ:"Qaysi oliygohga topshiryapsiz?",univPh:"Masalan: TATU, INHA, Milliy universitet...",lang:"TIL",followers:"Obunachilar",following:"Obunalar",noFol:"Hozircha hech kim yo'q",myPosts:"Postlari",noMyPosts:"Postlar yo'q",verified:"Tasdiqlangan",addCert:"Sertifikat berish",certTitle:"Sertifikat nomi",certUser:"@username",certImg:"Rasm biriktirish",certAdd:"Berish",closeX:"Yopish",support:"Homiylik",bossCab:"Boss Cabinet",unErr:"Username kamida 5 belgidan iborat bo'lishi va faqat harf, raqam, \"_\" va \".\" belgilaridan tashkil topishi kerak!",delUsrT:"Foydalanuvchini o'chirish",delUsrB:"Butunlay o'chirish",delUsrPh:"@username",delUsrConf:"Diqqat! Bu foydalanuvchi va uning barcha postlari, kommentlari butunlay o'chiriladi. Rostdan ham davom etasizmi?",delUsrOk:"Foydalanuvchi o'chirildi!",rmFol:"Olib tashlash",rmFolConf:"Bu obunachini ro'yxatdan olib tashlaysizmi?",savedTab:"Saqlangan",likedTab:"Layk bosgan",noSaved:"Saqlangan postlar yo'q",noLiked:"Layk bosilgan postlar yo'q",dlImg:"Yuklab olish",quoteTitle:"Javob postini yoz",qPh:"Fikringizni yozing...",postDeleted:"Post o'chirilgan",emoji:"Emojilar",ok:"OK",pollChoice:"Tanlov",pollAddChoice:"Tanlov qo'shish",pollLength:"So'rovnoma muddati",pollDays:"Kun",pollHours:"Soat",pollMinutes:"Daqiqa",pollRemove:"So'rovnomani olib tashlash",pollVotes:"ovoz",pollEnded:"Tugadi",pollTt:"So'rovnoma",imgTt:"Rasm",addImgRepost:"Rasm biriktirish"},
+en:{slogan:"School social network",tag:"Chalk up your school with your thoughts!",lg:"Log in",rg:"Sign up",na:"No account?",ha:"Have an account?",un:"Username",pw:"Password",fn:"Full name",uT:"Taken",uF:"Available",v1:"Chalking",v2:"News",v3:"Profile",v4:"Chat",v5:"Notifications",v6:"Language",v7:"CEO",out:"Log out",wh:"What's happening?!",md:"Image",ef:"No posts yet. Be first!",av:"Avatar",rl:"ROLE",st:"Student",tc:"Teacher",geo:"Region & school",ct:"COUNTRY",rgn:"REGION",sc:"SCHOOL",kl:"CLASS",c1:"Select country",c2:"Select region",c4:"Select school",c5:"Select class",bd:"BIRTHDAY",hd:"Hide",ht:"HEART",hA:"Single",hC:"Complicated",hL:"Taken",hP:"Mysterious",sv:"Save",svd:"Saved!",ac:"Account security",aU:"New username",aC:"Current password",aN:"New password",up:"Update",chs:"Chats",nc:"+ New",slc:"Select a chat",mp:"Type a message...",nch:"No chats",pu:"Enter username:",np:"New announcement...",pb:"Publish",nn:"No news",bd2:"Grant/revoke news rights",gr:"Toggle rights",ed:"Edit",dl:"Delete",fl:"Follow",uf:"Unfollow",sm:"Message",hdn:"Hidden",rp:"Write a reply...",snd:"Send",fc:"Be first to comment",cn:"cancel",cd:"Really delete?",ep:"New text:",rpl:"Reply",nnt:"No notifications",l1:"liked your post",l2:"commented",l3:"sent a message",l4:"new announcement",cN:"Name",cT:"Title",cB:"Bio",addCeo:"Add new CEO",today:"Today",yesterday:"Yesterday",editedTag:"(edited)",editingMsg:"Editing message...",vS:"Search",srchPh:"Search users...",nosr:"No users found",noCard:"Card not set yet",supTitle:"Support",supEdit:"Edit",ul:"Share",shCopied:"Link copied!",loading:"Loading",settings:"Settings",trophy:"Trophy Cabinet",noTr:"No certificates yet",univ:"Which university are you applying to?",univPh:"e.g. TATU, INHA, National University...",lang:"LANGUAGE",followers:"Followers",following:"Following",noFol:"No one here yet",myPosts:"Posts",noMyPosts:"No posts",verified:"Verified",addCert:"Grant certificate",certTitle:"Certificate title",certUser:"@username",certImg:"Attach image",certAdd:"Grant",closeX:"Close",support:"Support",bossCab:"Boss Cabinet",unErr:"Username must be at least 5 characters and contain only letters, numbers, \"_\" and \".\"!",delUsrT:"Delete user",delUsrB:"Delete permanently",delUsrPh:"@username",delUsrConf:"Warning! This user and all of their posts and comments will be permanently deleted. Are you sure you want to continue?",delUsrOk:"User deleted!",rmFol:"Remove",rmFolConf:"Remove this follower from your list?",savedTab:"Saved",likedTab:"Liked",noSaved:"No saved posts",noLiked:"No liked posts",dlImg:"Download",quoteTitle:"Write a quote post",qPh:"Add a comment...",postDeleted:"Post deleted",emoji:"Emoji",ok:"OK",pollChoice:"Choice",pollAddChoice:"Add choice",pollLength:"Poll length",pollDays:"Days",pollHours:"Hours",pollMinutes:"Minutes",pollRemove:"Remove poll",pollVotes:"votes",pollEnded:"Ended",pollTt:"Poll",imgTt:"Image",addImgRepost:"Attach image"},
+ru:{slogan:"Школьная соцсеть",tag:"Раскрась школу своими мыслями!",lg:"Войти",rg:"Регистрация",na:"Нет аккаунта?",ha:"Есть аккаунт?",un:"Имя пользователя",pw:"Пароль",fn:"Полное имя",uT:"Занято",uF:"Свободно",v1:"Chalking",v2:"Новости",v3:"Профиль",v4:"Чат",v5:"Уведомления",v6:"Язык",v7:"CEO",out:"Выйти",wh:"Что нового?!",md:"Фото",ef:"Постов нет. Будьте первым!",av:"Аватар",rl:"СТАТУС",st:"Ученик",tc:"Учитель",geo:"Регион и школа",ct:"СТРАНА",rgn:"ОБЛАСТЬ",sc:"ШКОЛА",kl:"КЛАСС",c1:"Выберите страну",c2:"Выберите область",c4:"Выберите школу",c5:"Выберите класс",bd:"ДЕНЬ РОЖДЕНИЯ",hd:"Скрыть",ht:"СЕРДЦЕ",hA:"Никого нет",hC:"Всё сложно",hL:"Занят(а)",hP:"Загадочно",sv:"Сохранить",svd:"Сохранено!",ac:"Безопасность",aU:"Новый username",aC:"Текущий пароль",aN:"Новый пароль",up:"Обновить",chs:"Чаты",nc:"+ Новый",slc:"Выберите чат",mp:"Сообщение...",nch:"Чатов нет",pu:"Введите username:",np:"Новое объявление...",pb:"Опубликовать",nn:"Новостей нет",bd2:"Право на новости",gr:"Переключить право",ed:"Изменить",dl:"Удалить",fl:"Подписаться",uf:"Отписаться",sm:"Написать",hdn:"Скрыто",rp:"Ответ...",snd:"Отправить",cn:"отмена",fc:"Будьте первым",cd:"Точно удалить?",ep:"Новый текст:",rpl:"Ответить",nnt:"Уведомлений нет",l1:"понравился ваш пост",l2:"комментировал",l3:"отправил сообщение",l4:"новое объявление",cN:"Имя",cT:"Должность",cB:"Био",addCeo:"Добавить нового CEO",today:"Сегодня",yesterday:"Вчера",editedTag:"(изменено)",editingMsg:"Редактирование сообщения...",vS:"Поиск",srchPh:"Поиск пользователей...",nosr:"Никто не найден",noCard:"Карта ещё не указана",supTitle:"Поддержка",supEdit:"Изменить",ul:"Поделиться",shCopied:"Ссылка скопирована!",loading:"Загрузка",settings:"Настройки",trophy:"Трофеи",noTr:"Сертификатов пока нет",univ:"В какой университет вы поступаете?",univPh:"напр. TATU, INHA, Национальный университет...",lang:"ЯЗЫК",followers:"Подписчики",following:"Подписки",noFol:"Пока никого нет",myPosts:"Посты",noMyPosts:"Постов нет",verified:"Подтверждено",addCert:"Выдать сертификат",certTitle:"Название сертификата",certUser:"@username",certImg:"Прикрепить фото",certAdd:"Выдать",closeX:"Закрыть",support:"Поддержка",bossCab:"Boss Cabinet",unErr:"Имя пользователя должно содержать минимум 5 символов и состоять только из букв, цифр, \"_\" и \".\"!",delUsrT:"Удалить пользователя",delUsrB:"Удалить навсегда",delUsrPh:"@username",delUsrConf:"Внимание! Этот пользователь и все его посты, комментарии будут удалены навсегда. Точно продолжить?",delUsrOk:"Пользователь удалён!",rmFol:"Удалить",rmFolConf:"Удалить этого подписчика из списка?",savedTab:"Сохранённые",likedTab:"Понравившиеся",noSaved:"Сохранённых постов нет",noLiked:"Постов с лайком нет",dlImg:"Скачать",quoteTitle:"Написать пост с цитатой",qPh:"Добавьте комментарий...",postDeleted:"Пост удалён",emoji:"Эмодзи",ok:"ОК",pollChoice:"Вариант",pollAddChoice:"Добавить вариант",pollLength:"Длительность опроса",pollDays:"Дни",pollHours:"Часы",pollMinutes:"Минуты",pollRemove:"Убрать опрос",pollVotes:"голосов",pollEnded:"Завершён",pollTt:"Опрос",imgTt:"Фото",addImgRepost:"Прикрепить фото"}};
 function t(k){return (TR[LANG]&&TR[LANG][k])||TR.uz[k]||k}
 
 var HO='<svg class="w-5 h-5 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
@@ -559,6 +671,63 @@ function classesFor(s){var o=[],n,i;s=s||"";
 function $(i){return document.getElementById(i)}
 function sh(i){$(i).classList.remove("hide")}
 function hd(i){$(i).classList.add("hide")}
+
+/* ---------- custom centered dialog: replaces native alert()/confirm() with
+   a real in-page dialog (styled like every other modal here) so error
+   messages and "really delete?" prompts stop looking like a raw browser
+   popup. cAlert() is fire-and-forget (matches old alert() call sites);
+   cConfirm() returns a Promise<boolean> so call sites just add "await". */
+function _closeDlg(ov){ov.classList.add("hide");setTimeout(function(){if(ov.parentNode)ov.parentNode.removeChild(ov)},200)}
+function cAlert(msg){
+ return new Promise(function(resolve){
+  var ov=document.createElement("div");ov.id="dlgOverlay";
+  ov.innerHTML='<div class="dlgBox">'+
+   '<div class="dlgIcon warn"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg></div>'+
+   '<p class="dlgMsg"></p>'+
+   '<div class="dlgBtns"><button class="dlgBtn dlgOk" id="dlgOkBtn"></button></div></div>';
+  ov.querySelector(".dlgMsg").textContent=msg||"";
+  ov.querySelector("#dlgOkBtn").textContent=t("ok");
+  document.body.appendChild(ov);
+  requestAnimationFrame(function(){ov.classList.remove("hide")});
+  function close(){_closeDlg(ov);resolve();document.removeEventListener("keydown",onKey)}
+  function onKey(e){if(e.key==="Enter"||e.key==="Escape")close()}
+  ov.querySelector("#dlgOkBtn").onclick=close;
+  ov.onclick=function(e){if(e.target===ov)close()};
+  document.addEventListener("keydown",onKey)
+ })}
+function cConfirm(msg,danger){
+ return new Promise(function(resolve){
+  var ov=document.createElement("div");ov.id="dlgOverlay";
+  ov.innerHTML='<div class="dlgBox">'+
+   '<div class="dlgIcon '+(danger===false?"info":"warn")+'"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg></div>'+
+   '<p class="dlgMsg"></p>'+
+   '<div class="dlgBtns"><button class="dlgBtn" id="dlgCancelBtn"></button><button class="dlgBtn '+(danger===false?"dlgOk":"dlgDanger")+'" id="dlgYesBtn"></button></div></div>';
+  ov.querySelector(".dlgMsg").textContent=msg||"";
+  ov.querySelector("#dlgCancelBtn").textContent=t("cn");
+  ov.querySelector("#dlgYesBtn").textContent=t("ok");
+  document.body.appendChild(ov);
+  requestAnimationFrame(function(){ov.classList.remove("hide")});
+  function done(v){_closeDlg(ov);resolve(v);document.removeEventListener("keydown",onKey)}
+  function onKey(e){if(e.key==="Escape")done(false);if(e.key==="Enter")done(true)}
+  ov.querySelector("#dlgYesBtn").onclick=function(){done(true)};
+  ov.querySelector("#dlgCancelBtn").onclick=function(){done(false)};
+  ov.onclick=function(e){if(e.target===ov)done(false)};
+  document.addEventListener("keydown",onKey)
+ })}
+/* ---------- top-sliding toast: for success/info messages (saved, link
+   copied, rights granted, ...) so they pop from the top like other apps'
+   push-style notifications, instead of a blocking alert(). */
+function showToast(msg,kind){
+ var stack=$("toastStack");if(!stack)return;
+ var el=document.createElement("div");el.className="toastItem "+(kind==="err"?"err":"ok");
+ var ico=kind==="err"?
+  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L6 18M6 6l12 12"/></svg>':
+  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
+ el.innerHTML='<span class="tIco">'+ico+'</span><span></span>';
+ el.querySelector("span:last-child").textContent=msg||"";
+ stack.appendChild(el);
+ requestAnimationFrame(function(){el.classList.add("show")});
+ setTimeout(function(){el.classList.remove("show");setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el)},350)},3200)}
 function esc(s){var d=document.createElement("div");d.textContent=s||"";return d.innerHTML}
 function loaderHTML(sm){return '<div class="ldrWrap'+(sm?' sm':'')+'"><span class="spinner"></span><span>'+t("loading")+'...</span></div>'}
 function ava(a){return a||"https://api.dicebear.com/7.x/thumbs/svg?seed=chalker"}
@@ -594,13 +763,13 @@ function chkU(inp,hint,ex){clearTimeout(uT);uT=setTimeout(async function(){
 function tAuth(l){if(l){sh("loginForm");hd("registerForm")}else{hd("loginForm");sh("registerForm")}}
 async function doLogin(){var b=$("tLB"),orig=b.textContent;b.disabled=true;b.innerHTML='<span class="btnSpin"></span>'+t("loading")+'...';
  try{var f=new FormData();f.append("username",$("lU").value);f.append("password",$("lP").value);
- var d=await api("/login",{method:"POST",body:f});setU(d.user);boot()}catch(e){alert(e.message)}
+ var d=await api("/login",{method:"POST",body:f});setU(d.user);boot()}catch(e){cAlert(e.message)}
  finally{b.disabled=false;b.textContent=orig}}
 async function doRegister(){
  var u=$("rU").value.trim().toLowerCase().replace(/^@/,"");
  var b=$("tRB"),orig=b.textContent;b.disabled=true;b.innerHTML='<span class="btnSpin"></span>'+t("loading")+'...';
  try{var f=new FormData();f.append("username",u);f.append("fullname",$("rF").value);f.append("password",$("rP").value);
- var d=await api("/register",{method:"POST",body:f});setU(d.user);boot()}catch(e){alert(e.message)}
+ var d=await api("/register",{method:"POST",body:f});setU(d.user);boot()}catch(e){cAlert(e.message)}
  finally{b.disabled=false;b.textContent=orig}}
 function setU(u){me=u;localStorage.setItem("chalker_user",JSON.stringify(u))}
 function logout(){localStorage.removeItem("chalker_user");me=null;curView=null;clearInterval(ntT);hd("appView");sh("authView")}
@@ -672,7 +841,7 @@ async function loadFeed(){try{
  if(!ps.length){$("feedList").innerHTML='<p class="text-center text-gray-600 p-10">'+t("ef")+'</p>';return}
  var h="";ps.forEach(function(p){pCache[p.id]=p;h+=rPost(p)});$("feedList").innerHTML=h;
  ps.forEach(function(p){if(oC[p.id]){sh("cm-"+p.id);loadCmts(p.id)}})
-}catch(e){alert(e.message)}}
+}catch(e){cAlert(e.message)}}
 function lkH(p){return (p.my_status===1?HF:HO)+' '+p.likes_count}
 function bmH(p){return (p.my_bookmark?
  '<svg class="w-[15px] h-[15px] inline" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>':
@@ -689,6 +858,48 @@ function quotedHTML(p){
  '<div class="flex items-center gap-1.5 text-[12.5px] min-w-0"><img src="'+ava(p.quoted_avatar_base64)+'" class="w-5 h-5 rounded-full object-cover bg-neutral-800 shrink-0">'+
  '<span class="font-bold truncate">'+esc(p.quoted_fullname)+'</span><span class="text-gray-600 shrink-0">@'+p.quoted_username+'</span></div>'+
  '<p class="text-[13.5px] mt-1 whitespace-pre-wrap break-words">'+lm(esc(p.quoted_content||""))+'</p>'+qm+'</div>'}
+function pollTimeLeft(endsAt){
+ var end=new Date((endsAt||"").replace(" ","T"));if(isNaN(end))return"";
+ var diff=end.getTime()-Date.now();if(diff<=0)return t("pollEnded");
+ var mins=Math.round(diff/60000);
+ if(mins<60)return mins+"m";
+ var hrs=Math.round(mins/60);if(hrs<24)return hrs+"h";
+ return Math.round(hrs/24)+"d"}
+function pollHTML(p){
+ var poll=p.poll;if(!poll)return"";
+ var ended=pollTimeLeft(poll.ends_at)===t("pollEnded");
+ var voted=poll.my_vote!=null;
+ var total=poll.total_votes||0;
+ var h='<div class="pollBox" id="pc-'+p.id+'" onclick="event.stopPropagation()">';
+ poll.options.forEach(function(o){
+  var pct=total>0?Math.round((o.votes_count/total)*100):0;
+  var mine=poll.my_vote!=null&&String(poll.my_vote)===String(o.id);
+  var clickable=!voted&&!ended;
+  h+='<div class="pollOpt'+((voted||ended)?' voted':'')+(mine?' mine':'')+'"'+
+   (clickable?' onclick="voteOnPoll(\''+p.id+'\',\''+o.id+'\')"':'')+'>'+
+   '<div class="pollFill" style="width:'+((voted||ended)?pct:0)+'%"></div>'+
+   '<div class="pollRow"><span>'+esc(o.option_text)+(mine?' &#10003;':'')+'</span>'+
+   ((voted||ended)?'<span class="pollPct">'+pct+'%</span>':'')+'</div></div>'});
+ h+='<p class="pollMeta">'+total+' '+t("pollVotes")+' · '+pollTimeLeft(poll.ends_at)+'</p></div>';
+ return h}
+async function voteOnPoll(postId,optionId){
+ var p=pCache[postId];if(!p||!p.poll||p._pollBusy)return;p._pollBusy=true;
+ var prevVote=p.poll.my_vote;
+ p.poll.my_vote=optionId;
+ var found=p.poll.options.find(function(o){return String(o.id)===String(optionId)});
+ if(found)found.votes_count=(found.votes_count||0)+1;
+ p.poll.total_votes=(p.poll.total_votes||0)+1;
+ var box=document.getElementById("pc-"+postId);if(box)box.outerHTML=pollHTML(p);
+ try{
+  var d=await api("/polls/vote",pj({user_id:me.id,post_id:postId,option_id:optionId}));
+  p.poll.options.forEach(function(o){var m=d.options.find(function(x){return String(x.id)===String(o.id)});if(m)o.votes_count=m.votes_count});
+  p.poll.total_votes=p.poll.options.reduce(function(s,o){return s+(o.votes_count||0)},0);
+  p.poll.my_vote=d.my_option_id;
+ }catch(e){
+  p.poll.my_vote=prevVote;cAlert(e.message)
+ }finally{
+  p._pollBusy=false;var box2=document.getElementById("pc-"+postId);if(box2)box2.outerHTML=pollHTML(p);
+ }}
 function rPost(p){
  var m="";
  if(p.media_base64&&p.media_type==="video")m='<video src="'+p.media_base64+'" controls preload="none" class="mt-2.5 rounded-2xl border brd max-h-96 w-full"></video>';
@@ -703,7 +914,7 @@ function rPost(p){
  '<div class="flex items-center gap-1.5 flex-wrap min-w-0 text-[13px] sm:text-sm">'+
  '<span class="font-bold cursor-pointer hover:underline truncate" onclick="openProfile(\''+p.username+'\')">'+esc(p.fullname)+bdg(p.username,p.can_post_news)+'</span>'+
  '<span class="text-gray-600 text-[11px] sm:text-xs shrink-0">· '+relTime(p.timestamp)+'</span></div>'+own+'</div>'+
- '<p id="pt-'+p.id+'" class="mt-1.5 text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words">'+lm(esc(p.content))+'</p>'+m+quotedHTML(p)+
+ '<p id="pt-'+p.id+'" class="mt-1.5 text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words">'+lm(esc(p.content))+'</p>'+m+pollHTML(p)+quotedHTML(p)+
  '<div class="flex items-center gap-1 -ml-2 mt-2 flex-wrap">'+
  '<button id="lk-'+p.id+'" onclick="react(\''+p.id+'\')" class="pAct'+(p.my_status===1?' on':'')+'">'+lkH(p)+'</button>'+
  '<button id="cmBtn-'+p.id+'" onclick="tglC(\''+p.id+'\')" class="pAct"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> '+p.comments_count+'</button>'+
@@ -716,8 +927,8 @@ function rPost(p){
  '<button onclick="sendCmt(\''+p.id+'\')" class="bb text-white text-sm font-bold rounded-full px-4">'+t("snd")+'</button></div></div></div></div></div>'}
 function sharePost(id){var url=window.location.origin+"/?post="+id;
  if(navigator.share){navigator.share({title:"Chalker",url:url}).catch(function(){})}
- else if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){alert(t("shCopied"))})}
- else alert(url)}
+ else if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){showToast(t("shCopied"))})}
+ else cAlert(url)}
 function openLightbox(src){var lb=$("lightbox");$("lbImg").src=src;lb.classList.remove("hide")}
 function closeLightbox(){$("lightbox").classList.add("hide");$("lbImg").src=""}
 async function dlMedia(url){
@@ -740,10 +951,15 @@ function toggleBookmark(id){
  }).catch(function(e){
   p.my_bookmark=was;p.bookmarks_count=prevCount;
   var b2=$("bm-"+id);if(b2){b2.innerHTML=bmH(p);b2.className="pAct"+(p.my_bookmark?" on":"")}
-  p._bmBusy=false;alert(e.message)
+  p._bmBusy=false;cAlert(e.message)
  })}
-/* QUOTE POST */
-var quoteTarget=null;
+/* QUOTE POST (repost with optional comment + image) */
+var quoteTarget=null,qMB64=null,qMType=null;
+function pickQMedia(inp){var f=inp.files[0];if(!f)return;
+ if(f.type.indexOf("image")!==0){cAlert("Faqat rasm yuklash mumkin!");inp.value="";return}
+ sh("qMBox");hd("qMImg");$("qMBox").insertAdjacentHTML("beforeend",'<div id="qMLdr" class="rounded-2xl border brd">'+loaderHTML(true)+'</div>');
+ cmpImg(f,function(d){var l=$("qMLdr");if(l)l.remove();qMB64=d;qMType="image";$("qMImg").src=d;sh("qMImg")})}
+function clrQMedia(){qMB64=null;qMType=null;$("qMInp").value="";hd("qMBox");hd("qMImg");var l=$("qMLdr");if(l)l.remove()}
 function quotedPreviewHTML(p){
  var media="";
  if(p.media_base64)media=p.media_type==="video"?
@@ -755,18 +971,19 @@ function quotedPreviewHTML(p){
 function openQuote(id){
  var p=pCache[id];if(!p)return;quoteTarget=id;
  $("tQuote").textContent=t("quoteTitle");$("qTxt").placeholder=t("qPh");
- $("qTxt").value="";$("qTxt").style.height="";
+ $("mIcoBtn-quote").title=t("addImgRepost");
+ $("qTxt").value="";$("qTxt").style.height="";clrQMedia();
  $("qPreview").innerHTML=quotedPreviewHTML(p);
  sh("quoteModal");$("qTxt").focus()}
 async function submitQuote(){
- var c=$("qTxt").value.trim();if(!c)return;
+ var c=$("qTxt").value.trim();if(!c&&!qMB64)return;
  var b=$("qBtn"),orig=b.textContent;b.disabled=true;b.innerHTML='<span class="btnSpin"></span>'+t("loading")+'...';
  try{
-  await api("/posts/create",pj({user_id:me.id,content:c,quoted_post_id:quoteTarget}));
-  hd("quoteModal");
+  await api("/posts/create",pj({user_id:me.id,content:c,quoted_post_id:quoteTarget,media_base64:qMB64,media_type:qMType}));
+  hd("quoteModal");clrQMedia();
   if(curView==="feed")loadFeed();
   else if(curView==="profile"&&mUser)loadProfileTabPosts(profileTab)
- }catch(e){alert(e.message)}
+ }catch(e){cAlert(e.message)}
  finally{b.disabled=false;b.textContent=orig}}
 function react(id){
  var p=pCache[id];if(!p||p._lkBusy)return;p._lkBusy=true;
@@ -781,12 +998,12 @@ function react(id){
  }).catch(function(e){
   p.my_status=wasLiked?1:null;p.likes_count=prevCount;
   var b2=$("lk-"+id);if(b2){b2.innerHTML=lkH(p);b2.className="pAct"+(p.my_status===1?' on':'')}
-  p._lkBusy=false;alert(e.message)
+  p._lkBusy=false;cAlert(e.message)
  })}
 async function edPost(id){var n=prompt(t("ep"),pCache[id].content);if(n===null)return;
- try{await api("/posts/update",pj({user_id:me.id,post_id:id,content:n}));pCache[id].content=n;$("pt-"+id).innerHTML=lm(esc(n))}catch(e){alert(e.message)}}
-async function dlPost(id){if(!confirm(t("cd")))return;
- try{await api("/posts/delete",pj({user_id:me.id,post_id:id}));loadFeed()}catch(e){alert(e.message)}}
+ try{await api("/posts/update",pj({user_id:me.id,post_id:id,content:n}));pCache[id].content=n;$("pt-"+id).innerHTML=lm(esc(n))}catch(e){cAlert(e.message)}}
+async function dlPost(id){if(!await cConfirm(t("cd")))return;
+ try{await api("/posts/delete",pj({user_id:me.id,post_id:id}));loadFeed()}catch(e){cAlert(e.message)}}
 function cmpImg(f,cb){var r=new FileReader();r.onload=function(e){var im=new Image();
  im.onload=function(){var mx=1280,w=im.width,h=im.height;
   if(w>mx||h>mx){if(w>h){h=Math.round(h*mx/w);w=mx}else{w=Math.round(w*mx/h);h=mx}}
@@ -800,15 +1017,73 @@ function cmpAvatar(f,cb){var r=new FileReader();r.onload=function(e){var im=new 
   var c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(im,0,0,w,h);cb(c.toDataURL("image/jpeg",.7))};
  im.src=e.target.result};r.readAsDataURL(f)}
 function pickMedia(inp){var f=inp.files[0];if(!f)return;
- if(f.type.indexOf("image")!==0){alert("Faqat rasm yuklash mumkin!");inp.value="";return}
+ if(f.type.indexOf("image")!==0){cAlert("Faqat rasm yuklash mumkin!");inp.value="";return}
+ closePollBuilder("main");
  sh("mBox");hd("mImg");hd("mVid");$("mBox").insertAdjacentHTML("beforeend",'<div id="mLdr" class="rounded-2xl border brd">'+loaderHTML(true)+'</div>');
  cmpImg(f,function(d){var l=$("mLdr");if(l)l.remove();mB64=d;mType="image";$("mImg").src=d;sh("mImg")})}
 function clrMedia(){mB64=null;mType=null;$("mInp").value="";hd("mBox");hd("mImg");hd("mVid");var l=$("mLdr");if(l)l.remove()}
 function autoGrow(el){el.style.height="auto";el.style.height=Math.min(el.scrollHeight,320)+"px"}
-async function createPost(){var c=$("pTxt").value.trim();if(!c&&!mB64)return;
+
+/* ---------- POLL BUILDER (x.com-style: choices + poll length) ----------
+   A single generic module drives the "main" composer's poll builder;
+   scope is kept as a string key so a second one (e.g. a quote box) could
+   reuse it later without duplicating this code. */
+var pollState={main:{active:false,choices:["",""],days:1,hours:0,minutes:0}};
+function togglePollBuilder(scope){
+ var st=pollState[scope];if(!st)return;
+ if(st.active){closePollBuilder(scope);return}
+ if(scope==="main")clrMedia(); // x.com-style: a post has either media or a poll, not both
+ st.active=true;st.choices=["",""];st.days=1;st.hours=0;st.minutes=0;
+ renderPollBuilder(scope)}
+function closePollBuilder(scope){
+ var st=pollState[scope];if(!st)return;
+ st.active=false;var wrap=$("pollBoxWrap-"+scope);if(wrap)wrap.innerHTML="";
+ var ib=$("pollIcoBtn-"+scope);if(ib)ib.classList.remove("active")}
+function renderPollBuilder(scope){
+ var st=pollState[scope];var wrap=$("pollBoxWrap-"+scope);if(!wrap)return;
+ var ib=$("pollIcoBtn-"+scope);if(ib)ib.classList.add("active");
+ var h='<div class="pollBuilder">';
+ st.choices.forEach(function(val,i){
+  h+='<div class="pollChoiceRow">'+
+   '<input class="inp" maxlength="80" placeholder="'+t("pollChoice")+' '+(i+1)+'" value="'+esc(val)+'" oninput="setPollChoice(\''+scope+'\','+i+',this.value)">'+
+   (st.choices.length>2?'<button type="button" class="pollRmChoice" onclick="removePollChoice(\''+scope+'\','+i+')">&#10005;</button>':'')+
+   '</div>'});
+ if(st.choices.length<4)h+='<button type="button" class="pollAddBtn" onclick="addPollChoice(\''+scope+'\')">+ '+t("pollAddChoice")+'</button>';
+ h+='<p class="pollLenLbl">'+t("pollLength")+'</p><div class="pollLenRow">'+
+  selHTML(scope,"days",0,7,st.days,t("pollDays"))+selHTML(scope,"hours",0,23,st.hours,t("pollHours"))+selHTML(scope,"minutes",0,59,st.minutes,t("pollMinutes"))+
+  '</div>'+
+  '<button type="button" class="pollRemoveBtn" onclick="closePollBuilder(\''+scope+'\')">'+t("pollRemove")+'</button>'+
+  '</div>';
+ wrap.innerHTML=h}
+function selHTML(scope,field,min,max,val,label){
+ var h='<select onchange="setPollField(\''+scope+'\',\''+field+'\',this.value)" title="'+label+'">';
+ for(var i=min;i<=max;i++)h+='<option value="'+i+'"'+(i===val?" selected":"")+'>'+i+" "+label+"</option>";
+ return h+"</select>"}
+function setPollChoice(scope,i,val){pollState[scope].choices[i]=val}
+function setPollField(scope,field,val){pollState[scope][field]=parseInt(val,10)||0}
+function addPollChoice(scope){var st=pollState[scope];if(st.choices.length>=4)return;st.choices.push("");renderPollBuilder(scope)}
+function removePollChoice(scope,i){var st=pollState[scope];if(st.choices.length<=2)return;st.choices.splice(i,1);renderPollBuilder(scope)}
+function rerenderPollBuilders(){Object.keys(pollState).forEach(function(scope){if(pollState[scope].active)renderPollBuilder(scope)})}
+/* returns {options,minutes} when a valid (>=2 filled choices) poll is
+   being built in this scope, otherwise null */
+function getPollPayload(scope){
+ var st=pollState[scope];if(!st||!st.active)return null;
+ var opts=st.choices.map(function(c){return c.trim()}).filter(Boolean);
+ if(opts.length<2)return null;
+ var mins=st.days*1440+st.hours*60+st.minutes;if(mins<=0)mins=1440;
+ return{options:opts,minutes:mins}}
+
+async function createPost(){
+ var c=$("pTxt").value.trim();
+ var poll=getPollPayload("main");
+ if(!c&&!mB64&&!poll)return;
  var b=$("chalkBtn"),orig=b.textContent;b.disabled=true;b.innerHTML='<span class="btnSpin"></span>'+t("loading")+'...';
- try{await api("/posts/create",pj({user_id:me.id,content:c,media_base64:mB64,media_type:mType}));
-  $("pTxt").value="";$("pTxt").style.height="";clrMedia();loadFeed()}catch(e){alert(e.message)}
+ try{
+  var payload={user_id:me.id,content:c,media_base64:mB64,media_type:mType};
+  if(poll){payload.poll_options=poll.options;payload.poll_minutes=poll.minutes}
+  await api("/posts/create",pj(payload));
+  $("pTxt").value="";$("pTxt").style.height="";clrMedia();closePollBuilder("main");loadFeed()
+ }catch(e){cAlert(e.message)}
  finally{b.disabled=false;b.textContent=orig}}
 
 /* COMMENTS */
@@ -835,7 +1110,7 @@ async function loadCmts(id){var box=$("cl-"+id);if(!box||box.dataset.busy==="1")
  catch(e){box.innerHTML='<p class="text-red-400 text-xs cursor-pointer" onclick="loadCmts('+id+')">'+(e.message||"Xato")+' · \u21bb</p>'}
  finally{box.dataset.busy="0"}}
 async function delCmt(postId, commentId) {
-  if (!confirm(t("cd"))) return;
+  if (!await cConfirm(t("cd"))) return;
   try {
     await api("/comments/delete", pj({ user_id: me?.id, comment_id: commentId }));
     if (pCache[postId] && pCache[postId].comments_count > 0) pCache[postId].comments_count--;
@@ -845,7 +1120,7 @@ async function delCmt(postId, commentId) {
     }
     loadCmts(postId);
   } catch (e) {
-    alert(e.message);
+    cAlert(e.message);
   }
 }
 
@@ -886,7 +1161,7 @@ async function sendCmt(p) {
     oC[p] = true;
     loadCmts(p);
   } catch (e) {
-    alert(e.message);
+    cAlert(e.message);
   }
 }
 /* PROFILE SETTINGS (own account only, opened via gear icon) */
@@ -912,14 +1187,14 @@ async function saveProfile(){try{
  f.append("role",$("pRole").value);f.append("bio",$("pBio").value);f.append("birth_date",$("pBd").value);
  f.append("hide_birth_date",$("pHB").checked?1:0);f.append("heart_status",$("pHt").value);
  f.append("avatar_base64",avB64||"");f.append("university",$("pUniv").value);
- var d=await api("/profile/update",{method:"POST",body:f});setU(d.user);renderSide();alert(t("svd"));
- if($("view-profile").classList.contains("hide")===false)loadProfilePage(me.username,true)}catch(e){alert(e.message)}}
+ var d=await api("/profile/update",{method:"POST",body:f});setU(d.user);renderSide();showToast(t("svd"));
+ if($("view-profile").classList.contains("hide")===false)loadProfilePage(me.username,true)}catch(e){cAlert(e.message)}}
 async function saveAccount(){try{
  var nu=$("aU").value.trim().toLowerCase().replace(/^@/,"");
- if(nu&&!USERNAME_RE.test(nu)){alert(t("unErr"));return}
+ if(nu&&!USERNAME_RE.test(nu)){cAlert(t("unErr"));return}
  var f=new FormData();f.append("user_id",me.id);f.append("current_password",$("aC").value);
  f.append("new_username",nu);f.append("new_password",$("aN").value);
- var d=await api("/account/update",{method:"POST",body:f});setU(d.user);renderSide();alert(t("svd"))}catch(e){alert(e.message)}}
+ var d=await api("/account/update",{method:"POST",body:f});setU(d.user);renderSide();showToast(t("svd"))}catch(e){cAlert(e.message)}}
 function changeLang(l){LANG=l;localStorage.setItem("chalker_lang",l);applyLang();buildNav();
  if(!$("view-profile").classList.contains("hide"))loadProfilePage(mUser?mUser.username:me.username,!mUser||mUser.username===me.username)}
 
@@ -946,7 +1221,7 @@ async function loadNews(){try{
   '<button onclick="sendNCmt(\''+n.id+'\')" class="bb text-white text-sm font-bold rounded-full px-4">'+t("snd")+'</button></div></div></div>'});
  $("newsList").innerHTML=h;
  ns.forEach(function(n){if(oNC[n.id]){sh("ncm-"+n.id);loadNCmts(n.id)}})
-}catch(e){alert(e.message)}}
+}catch(e){cAlert(e.message)}}
 function nReact(id){
  var n=nCache[id];if(!n||n._lkBusy)return;n._lkBusy=true;
  var wasLiked=!!n.my_like,prevCount=n.likes_count;
@@ -959,7 +1234,7 @@ function nReact(id){
  }).catch(function(e){
   n.my_like=wasLiked?1:null;n.likes_count=prevCount;
   var b2=$("nlk-"+id);if(b2){b2.innerHTML=nlkH(n);b2.className="pAct"+(n.my_like?' on':'')}
-  n._lkBusy=false;alert(e.message)
+  n._lkBusy=false;cAlert(e.message)
  })}
 function tglNC(id){var b=$("ncm-"+id);if(!b||b.dataset.busy==="1")return;
  if(b.classList.contains("hide")){b.classList.remove("hide");oNC[id]=true;loadNCmts(id)}else{b.classList.add("hide");oNC[id]=false}}
@@ -985,11 +1260,11 @@ function cmtReact(id,isNews){
   var b2=$((isNews?"nclk-":"clk-")+id);if(b2){b2.innerHTML=(d.liked?HF:HO)+' '+d.count;b2.className="stk cstk stk-like"+(d.liked?' on':'');b2.dataset.busy="0"}
  }).catch(function(e){
   var b2=$((isNews?"nclk-":"clk-")+id);if(b2){b2.innerHTML=(wasLiked?HF:HO)+' '+prevCount;b2.className="stk cstk stk-like"+(wasLiked?' on':'');b2.dataset.busy="0"}
-  alert(e.message)
+  cAlert(e.message)
  })}
 async function delNCmt(newsId, commentId) {
-  if (!me || !me.id) return alert("Avval tizimga kiring!");
-  if (!confirm(t("cd"))) return;
+  if (!me || !me.id) return cAlert("Avval tizimga kiring!");
+  if (!await cConfirm(t("cd"))) return;
   try {
     await api("/news/comments/delete", pj({ user_id: me.id, comment_id: commentId }));
     if (nCache[newsId] && nCache[newsId].comments_count > 0) {
@@ -999,12 +1274,12 @@ async function delNCmt(newsId, commentId) {
     }
     loadNCmts(newsId);
   } catch (e) {
-    alert(e.message);
+    cAlert(e.message);
   }
 }
 
 async function sendNCmt(id) {
-  if (!me || !me.id) return alert("Avval tizimga kiring!");
+  if (!me || !me.id) return cAlert("Avval tizimga kiring!");
   var i = $("nci-" + id), c = i.value.trim();
   if (!c) return;
   try {
@@ -1013,12 +1288,12 @@ async function sendNCmt(id) {
     oNC[id] = true;
     loadNCmts(id);
   } catch (e) {
-    alert(e.message);
+    cAlert(e.message);
   }
 }
 
 async function pubNews() {
-  if (!me || !me.id) return alert("Avval tizimga kiring!");
+  if (!me || !me.id) return cAlert("Avval tizimga kiring!");
   var v = $("nInp").value.trim();
   if (!v) return;
   try {
@@ -1026,60 +1301,60 @@ async function pubNews() {
     $("nInp").value = "";
     loadNews();
   } catch (e) {
-    alert(e.message);
+    cAlert(e.message);
   }
 }
 
 async function edNews(id) {
-  if (!me || !me.id) return alert("Avval tizimga kiring!");
+  if (!me || !me.id) return cAlert("Avval tizimga kiring!");
   var n = prompt(t("ep"), nCache[id].title);
   if (n === null) return;
   try {
     await api("/news/update", pj({ user_id: me.id, news_id: id, title: n }));
     loadNews();
   } catch (e) {
-    alert(e.message);
+    cAlert(e.message);
   }
 }
 
 async function dlNews(id) {
-  if (!me || !me.id) return alert("Avval tizimga kiring!");
-  if (!confirm(t("cd"))) return;
+  if (!me || !me.id) return cAlert("Avval tizimga kiring!");
+  if (!await cConfirm(t("cd"))) return;
   try {
     await api("/news/delete", pj({ user_id: me.id, news_id: id }));
     loadNews();
   } catch (e) {
-    alert(e.message);
+    cAlert(e.message);
   }
 }
 
 async function grantNews() {
-  if (!me || !me.id) return alert("Avval tizimga kiring!");
+  if (!me || !me.id) return cAlert("Avval tizimga kiring!");
   var u = $("gU").value.trim();
   if (!u) return;
   try {
     var d = await api("/admin/news_rights", pj({ boss_id: me.id, target_username: u }));
-    alert("@" + u.replace(/^@/, "") + (d.granted ? " \u2713" : " \u2717"));
+    showToast("@" + u.replace(/^@/, "") + (d.granted ? " \u2713" : " \u2717"));
     $("gU").value = "";
   } catch (e) {
-    alert(e.message);
+    cAlert(e.message);
   }
 }
 
 async function bossDeleteUser() {
-  if (!me || !me.id) return alert("Avval tizimga kiring!");
+  if (!me || !me.id) return cAlert("Avval tizimga kiring!");
   var u = $("delU").value.trim().replace(/^@/, "");
   if (!u) return;
-  if (u.toLowerCase() === "boss") return alert(t("delUsrConf"));
-  if (!confirm(t("delUsrConf"))) return;
+  if (u.toLowerCase() === "boss") return cAlert(t("delUsrConf"));
+  if (!await cConfirm(t("delUsrConf"))) return;
   var b = $("tDelUsrB"), orig = b.textContent;
   b.disabled = true; b.innerHTML = '<span class="btnSpin"></span>' + t("loading") + '...';
   try {
     await api("/admin/delete_user", pj({ boss_id: me.id, target_username: u }));
     $("delU").value = "";
-    alert(t("delUsrOk"));
+    showToast(t("delUsrOk"));
   } catch (e) {
-    alert(e.message);
+    cAlert(e.message);
   } finally {
     b.disabled = false; b.textContent = orig;
   }
@@ -1106,7 +1381,7 @@ function doSearch(){
     '<button onclick="srchFollow(\''+u.username+'\',this)" class="shrink-0 '+(u.is_following?'border brd font-bold':'bb text-white font-bold')+' rounded-full px-4 py-1.5 text-xs">'+(u.is_following?t("uf"):t("fl"))+'</button></div>'
    });
    $("srchList").innerHTML=h;
-  }catch(e){alert(e.message)}
+  }catch(e){cAlert(e.message)}
  },300)}
 async function srchFollow(u,btn){
  if(btn.dataset.busy==="1")return;btn.dataset.busy="1";
@@ -1120,7 +1395,7 @@ async function srchFollow(u,btn){
  }catch(e){
   if(was){btn.textContent=t("uf");btn.className="shrink-0 border brd font-bold rounded-full px-4 py-1.5 text-xs"}
   else{btn.textContent=t("fl");btn.className="shrink-0 bb text-white font-bold rounded-full px-4 py-1.5 text-xs"}
-  alert(e.message)
+  cAlert(e.message)
  }
  btn.dataset.busy="0"
 }
@@ -1182,7 +1457,7 @@ async function loadProfilePage(u,isSelf){try{
   loadTrophy(d.username,isSelf)
  }
  profileIsSelf=isSelf;profileTab="posts";buildProfileTabs();loadProfileTabPosts("posts")
-}catch(e){alert(e.message)}}
+}catch(e){cAlert(e.message)}}
 async function tglFollowVP(){
  if(!mUser||tglFollowVP._busy)return;tglFollowVP._busy=true;
  var was=!!mUser.is_following,prevFw=mUser.followers||0;
@@ -1199,7 +1474,7 @@ async function tglFollowVP(){
   mUser.is_following=was;mUser.followers=prevFw;
   if(b){b.textContent=mUser.is_following?t("uf"):t("fl");b.className="bb text-white font-bold rounded-full px-5 py-2 text-sm"+(mUser.is_following?" border brd":"")}
   if(fw)fw.textContent=mUser.followers;
-  alert(e.message)
+  cAlert(e.message)
  }
  tglFollowVP._busy=false
 }
@@ -1210,7 +1485,7 @@ function pickCertImg(inp){var f=inp.files[0];if(!f)return;
  cmpImg(f,function(d){ctB64=d;l.classList.add("hide")})}
 async function addOwnCert(){var ti=$("ctTitle").value.trim();if(!ti)return;
  try{await api("/certificates/self_create",pj({user_id:me.id,title:ti,image_base64:ctB64}));
-  $("ctTitle").value="";$("ctImg").value="";ctB64=null;hd("certFormBox");loadTrophy(me.username,true)}catch(e){alert(e.message)}}
+  $("ctTitle").value="";$("ctImg").value="";ctB64=null;hd("certFormBox");loadTrophy(me.username,true)}catch(e){cAlert(e.message)}}
 async function loadTrophy(u,isSelf){try{
  $("trophyGrid").innerHTML=loaderHTML(true);hd("noTrMsg");
  var certs=await api("/certificates?username="+encodeURIComponent(u));certCache={};
@@ -1229,8 +1504,8 @@ function openCert(id,isSelf){var c=certCache[id];if(!c)return;
  var delBtn=$("certDelBtn");
  if(isSelf){delBtn.classList.remove("hide");delBtn.onclick=function(){delOwnCert(id)}}else{delBtn.classList.add("hide")}
  sh("certModal")}
-async function delOwnCert(id){if(!confirm(t("cd")))return;
- try{await api("/certificates/self_delete",pj({user_id:me.id,cert_id:id}));hd("certModal");loadTrophy(me.username,true)}catch(e){alert(e.message)}}
+async function delOwnCert(id){if(!await cConfirm(t("cd")))return;
+ try{await api("/certificates/self_delete",pj({user_id:me.id,cert_id:id}));hd("certModal");loadTrophy(me.username,true)}catch(e){cAlert(e.message)}}
 /* PROFILE TABS: own posts / saved / liked (saved & liked are private -- only shown on your own profile) */
 var profileTab="posts",profileIsSelf=false;
 function buildProfileTabs(){
@@ -1265,9 +1540,9 @@ async function openFollowList(kind){try{
   '<p class="text-sm font-bold truncate">'+esc(u.fullname||u.username)+bdg(u.username,u.can_post_news)+'</p>'+
   '<p class="text-xs text-gray-500 truncate">@'+u.username+'</p></div>'+
   '<div class="flex gap-1.5 shrink-0">'+flBtn+rmBtn+'</div></div>'});
- $("followListBox").innerHTML=h}catch(e){alert(e.message)}}
+ $("followListBox").innerHTML=h}catch(e){cAlert(e.message)}}
 async function rmFollower(u,btn){
- if(!confirm(t("rmFolConf")))return;
+ if(!await cConfirm(t("rmFolConf")))return;
  try{
   await api("/users/remove_follower",pj({owner_id:me.id,follower_username:u}));
   var row=btn.closest("div.flex.items-center");
@@ -1277,7 +1552,7 @@ async function rmFollower(u,btn){
    var fw=$("vpFw");if(fw)fw.textContent=mUser.followers;
    if(me.id===mUser.id){me.followers=mUser.followers}
   }
- }catch(e){alert(e.message)}}
+ }catch(e){cAlert(e.message)}}
 
 /* BOOT */
 function applyLang(){
@@ -1286,7 +1561,10 @@ function applyLang(){
  $("lU").placeholder=t("un");$("lP").placeholder=t("pw");$("rU").placeholder=t("un");$("rF").placeholder=t("fn");$("rP").placeholder=t("pw");
  $("tLB").textContent=t("lg");$("tRB").textContent=t("rg");$("tNA").textContent=t("na");$("tGR").textContent=t("rg");
  $("tHA").textContent=t("ha");$("tGL").textContent=t("lg");$("tOut2").textContent=t("out");$("tEmoji").textContent=t("emoji");
- $("pTxt").placeholder=t("wh");$("tMd").textContent=t("md");$("tAvt").textContent=t("av");
+ $("pTxt").placeholder=t("wh");$("tAvt").textContent=t("av");
+ ["mIcoBtn-main","mIcoBtn-quote"].forEach(function(id){var el=$(id);if(el)el.title=t("imgTt")});
+ ["pollIcoBtn-main","pollIcoBtn-quote"].forEach(function(id){var el=$(id);if(el)el.title=t("pollTt")});
+ rerenderPollBuilders();
  $("tFN").textContent=t("fn").toUpperCase();$("tRl").textContent=t("rl");$("tSettings").textContent=t("settings");
  var ro=$("pRole").options;ro[0].text=t("st");ro[1].text=t("tc");
  $("tGeo").textContent=t("geo");$("tRg").textContent=t("rgn");
