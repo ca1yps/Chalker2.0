@@ -5,6 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 
+<!-- Favicon: bold "C" wordmark, black bg, white mark. Browsers' bookmark /
+     speed-dial tiles (e.g. Brave's "frequently visited" grid) generally
+     request real image files at well-known paths and don't reliably read
+     an inline SVG data: URI, which is why Chalker showed up blank next to
+     every other site there. Real PNG/ICO files served by the backend
+     (below) fix that; the data: SVG stays too as an instant-paint fallback
+     for browsers that do support it. -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23000'/%3E%3Ctext x='50' y='71' font-family='Arial, Helvetica, sans-serif' font-weight='800' font-size='62' fill='%23fff' text-anchor='middle'%3EC%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+
 <!-- 1. Title (Sarlavha): Kalit so'zlar jamlangan -->
 <title>Chalker | Chalking – Maktab ijtimoiy tarmog'i</title>
 
@@ -24,9 +39,6 @@
 <!-- Canonical havola -->
 <link rel="canonical" href="https://chalker.uz">
 
-<!-- Favicon va Manbalar -->
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,...">
-<link rel="apple-touch-icon" href="data:image/svg+xml,...">
 <script src="https://telegram.org/js/telegram-web-app.js" onerror="this.remove()"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
@@ -169,6 +181,12 @@ button.border.brd:hover{border-color:#536471;background:rgba(239,243,244,.04)}
 [id^="cl-"]>div:nth-child(2),[id^="ncl-"]>div:nth-child(2){animation-delay:.06s}
 [id^="cl-"]>div:nth-child(3),[id^="ncl-"]>div:nth-child(3){animation-delay:.10s}
 [id^="cl-"]>div:nth-child(n+4),[id^="ncl-"]>div:nth-child(n+4){animation-delay:.12s}
+
+/* ---------- feed composer stays pinned right under the top bar while
+   scrolling, instead of scrolling away with the posts. --topbarH is kept
+   in sync with the real rendered height of #mobTopBar by JS (it changes
+   across breakpoints), so the composer never overlaps or gaps under it. */
+.composerSticky{position:sticky;top:var(--topbarH,56px);z-index:9;background:rgba(0,0,0,.85);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 
 /* ---------- responsive scale for headline logo/tag ---------- */
 #heroLogo{font-size:1.9rem;line-height:1}
@@ -377,8 +395,8 @@ button,[onclick],.pAct,.stk,.mention{touch-action:manipulation;-webkit-tap-highl
  </div>
 </div>
 
-<div id="appView" class="hide w-full max-w-[1500px] mx-auto flex min-h-screen">
- <aside class="hidden lg:flex lg:w-80 xl:w-96 shrink-0 border-r brd p-3 lg:p-5 flex-col sticky top-0 h-screen panel transition-[width] duration-300 z-20">
+<div id="appView" class="hide w-full flex min-h-screen">
+ <aside class="hidden lg:flex lg:w-[max(270px,21vw)] shrink-0 border-r brd p-3 lg:p-5 flex-col sticky top-0 h-screen panel z-20">
   <div id="sideLogo" class="hidden md:block text-4xl px-2"></div>
   <p id="sideTag" class="hidden md:block text-[10px] text-gray-500 px-2 mb-5"></p>
   <nav id="navBox" class="space-y-2 flex-1"></nav>
@@ -391,7 +409,7 @@ button,[onclick],.pAct,.stk,.mention{touch-action:manipulation;-webkit-tap-highl
   </div>
  </aside>
 
- <main id="appMain" class="flex-1 min-w-0 xl:max-w-[680px] xl:border-x xl:brd">
+ <main id="appMain" class="flex-1 min-w-0 xl:border-x xl:brd">
   <div id="mobTopBar" class="border-b brd p-3 sm:p-4 md:p-5 flex items-center justify-between md:justify-center sticky top-0 z-10" style="background:rgba(0,0,0,.85);backdrop-filter:blur(10px)">
    <img id="mobAv" onclick="showView('profile')" class="lg:hidden w-8 h-8 rounded-full object-cover bg-neutral-800 cursor-pointer shrink-0">
    <div class="text-center flex-1 lg:flex-none">
@@ -401,7 +419,7 @@ button,[onclick],.pAct,.stk,.mention{touch-action:manipulation;-webkit-tap-highl
   </div>
 
   <div id="view-feed">
-   <div class="border-b brd p-3 sm:p-4"><div class="flex gap-2.5 sm:gap-3">
+   <div id="composerBar" class="composerSticky border-b brd p-3 sm:p-4"><div class="flex gap-2.5 sm:gap-3">
     <img id="cAv" class="w-11 h-11 rounded-full object-cover bg-neutral-800">
     <div class="flex-1">
      <textarea id="pTxt" rows="2" oninput="autoGrow(this)" class="w-full bg-transparent text-lg resize-none overflow-hidden leading-snug"></textarea>
@@ -512,7 +530,7 @@ button,[onclick],.pAct,.stk,.mention{touch-action:manipulation;-webkit-tap-highl
 
  </main>
 
- <aside class="hidden xl:flex xl:w-96 shrink-0 border-l brd p-4 flex-col gap-4 sticky top-0 h-screen panel z-20">
+ <aside class="hidden xl:flex xl:w-[max(320px,24vw)] shrink-0 border-l brd p-4 flex-col gap-4 sticky top-0 h-screen panel z-20">
   <div class="border brd rounded-2xl p-4 panel flex-1 min-h-0 flex flex-col">
    <p id="tEmoji" class="font-extrabold text-sm mb-3"></p>
    <div id="emojiGrid" class="grid grid-cols-8 gap-1 text-xl overflow-y-auto flex-1 min-h-0 pr-1"></div>
@@ -1589,6 +1607,7 @@ function renderSide(){
  if(me.username==="boss"||me.can_post_news===1)sh("newsComposer");else hd("newsComposer")}
 function boot(){
  curView=null;hd("authView");sh("appView");buildNav();renderSide();buildEmojiGrid();showView("feed");
+ syncTopbarHeight();setTimeout(syncTopbarHeight,60);
  clearInterval(ntT);ntT=setInterval(function(){loadNotifs(false)},20000);loadNotifs(false)}
 function initTelegram(){
  try{
@@ -1608,6 +1627,13 @@ setRealVH();
 window.addEventListener("resize",setRealVH);
 window.addEventListener("orientationchange",function(){setTimeout(setRealVH,150)});
 if(window.visualViewport)window.visualViewport.addEventListener("resize",setRealVH);
+/* keep the feed composer's sticky offset in sync with the top bar's real
+   height -- it changes across breakpoints (padding + logo font-size), so
+   a fixed px value would either leave a gap or overlap it. */
+function syncTopbarHeight(){var bar=$("mobTopBar");if(!bar)return;
+ document.documentElement.style.setProperty("--topbarH",bar.offsetHeight+"px")}
+window.addEventListener("resize",syncTopbarHeight);
+window.addEventListener("orientationchange",function(){setTimeout(syncTopbarHeight,150)});
 document.addEventListener("DOMContentLoaded",function(){
  initTelegram();
  applyLang();
